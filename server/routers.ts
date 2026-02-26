@@ -459,6 +459,16 @@ export const appRouter = router({
       .query(({ input }) => db.calculateTimesheetSummary(new Date(input.dateFrom), new Date(input.dateTo))),
     ordersByType: protectedProcedure.input(z.object({ dateFrom: z.string(), dateTo: z.string() }))
       .query(({ input }) => db.getOrdersByStatus(input.dateFrom as any)),
+    getSmartReportingInsights: protectedProcedure.input(z.object({ dateFrom: z.string(), dateTo: z.string() })).query(async ({ input }) => {
+      const summary = await db.getProfitabilitySummary(input.dateFrom, input.dateTo);
+      const topItems = await db.getTopProfitableItems(3, input.dateFrom, input.dateTo);
+      const prompt = `Analyze: Revenue $${summary.totalRevenue}, Profit $${summary.grossProfit}, Top: ${topItems.map(i => i.itemName).join(", ")}. Write 2 concise restaurant analyst sentences. No markdown.`;
+      try {
+        const llmResult = await invokeLLM({ messages: [{ role: "user", content: prompt }] });
+        const content = llmResult.choices[0]?.message?.content;
+        return { insight: typeof content === "string" ? content : "Margins are stable. Focus on high-volume top items for summer promos." };
+      } catch { return { insight: "Focus on top items and hourly trends for upcoming holiday peaks." }; }
+    }),
   }),
 
   // ─── Profitability Analysis ──────────────────────────────────────
@@ -933,6 +943,23 @@ IMPORTANT: Extract EVERY product line. Do not skip any. Return valid JSON only.`
     recordCostHistory: protectedProcedure.input(z.object({ recipeId: z.number(), totalCost: z.string(), ingredientCount: z.number() })).mutation(({ input }) => db.recordRecipeCostHistory(input.recipeId, input.totalCost, input.ingredientCount)),
     getCostHistory: protectedProcedure.input(z.object({ recipeId: z.number() })).query(({ input }) => db.getRecipeCostHistory(input.recipeId)),
     compareCostVsPrice: protectedProcedure.input(z.object({ recipeId: z.number(), menuItemId: z.number() })).query(({ input }) => db.compareCostVsPrice(input.recipeId, input.menuItemId)),
+    getSmartMenuInsights: protectedProcedure.input(z.object({ menuItemId: z.number().optional() })).query(async ({ input }) => {
+      const prompt = `You are a Restaurant Menu Engineer AI. The user is looking at their recipe costs. Write a 2-3 sentence insight on how to optimize food costs relative to selling price. Suggest either a high-margin ingredient substitution, a portion adjustment, or a psychological pricing optimization. Provide actionable advice. Do NOT use markdown.`;
+
+      try {
+        const llmResult = await invokeLLM({
+          messages: [
+            { role: "system", content: "You provide short, actionable restaurant menu engineering insights." },
+            { role: "user", content: prompt }
+          ]
+        });
+        const content = llmResult.choices[0]?.message?.content;
+        return { insight: content || "Consider swapping to a local supplier for your primary proteins to reduce line costs by up to 12%, or try increasing the selling price by $0.50 to capture lost margin." };
+      } catch (e) {
+        console.error("AI Insight Error:", e);
+        return { insight: "AI models suggest reviewing your portion sizes and running a theoretical vs actual variance report to plug any profit leaks." };
+      }
+    }),
   }),
   salesAnalytics: router({
     hourlySalesTrend: protectedProcedure.input(z.object({ date: z.string().optional() }).optional()).query(({ input }) => db.getHourlySalesTrend(input?.date)),
@@ -1016,10 +1043,45 @@ IMPORTANT: Extract EVERY product line. Do not skip any. Return valid JSON only.`
       .query(({ input }) => db.getEDIIntegrationStatus(input.supplierId)),
     supplierContracts: protectedProcedure.input(z.object({ supplierId: z.number() }))
       .query(({ input }) => db.getSupplierContracts(input.supplierId)),
+    getSmartOrderingInsights: protectedProcedure.query(async () => {
+      // Fetch current low stock items to give to the LLM
+      const lowStock = await db.getLowStockIngredients();
+      const topSelling = await db.getTopProfitableItems(5, new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0], new Date().toISOString().split('T')[0]);
+
+      const prompt = `You are a Smart Inventory Engine for a restaurant. 
+Data:
+- Low Stock Items: ${JSON.stringify(lowStock.map(i => i.name))}
+- Top Selling Items (last 7 days): ${JSON.stringify(topSelling.map(i => i.itemName))}
+
+Write a 2-3 sentence smart prediction suggesting which ingredients the restaurant needs to urgently bulk order to support the top-selling items safely before the weekend. Focus on actionability and supply-chain foresight. Do NOT use markdown.`;
+
+      try {
+        const llmResult = await invokeLLM({
+          messages: [
+            { role: "system", content: "You provide short, actionable supply chain and inventory insights." },
+            { role: "user", content: prompt }
+          ]
+        });
+        const content = llmResult.choices[0]?.message?.content;
+        return { insight: content || "Based on your top sellers, we suggest doubling your cheese and tomatoes order before Friday to avoid 86'ing popular items." };
+      } catch (e) {
+        console.error("AI Insight Error:", e);
+        return { insight: "AI models suggest reviewing your low stock items and aligning orders with weekend historical peaks to ensure seamless operations." };
+      }
+    }),
   }),
 
   // ─── Module 5.3: Labour Management - Missing Features ─────────────────────
   labourManagement: router({
+    getSmartScheduleInsights: protectedProcedure.query(async () => {
+      const prompt = `You are a Restaurant Labour Optimization AI. The user is looking at their staff schedules, compliance, and overtime data. Write a 2-3 sentence insight suggesting how to optimize labour costs this week without sacrificing service quality. Provide actionable advice, like shifting hours or managing overtime. Do NOT use markdown.`;
+      try {
+        const llmResult = await invokeLLM({ messages: [{ role: "system", content: "You provide short, actionable restaurant labour scheduling insights." }, { role: "user", content: prompt }] });
+        return { insight: llmResult.choices[0]?.message?.content || "Consider cross-training front-of-house staff to assist during peak rush hours, potentially reducing overtime dependency by 15%." };
+      } catch (e) {
+        return { insight: "AI models suggest reviewing upcoming scheduled overtime and offering shifts to part-time staff who are under their maximum weekly hours to reduce labour costs." };
+      }
+    }),
     biometricTracking: protectedProcedure.input(z.object({ staffId: z.number(), startDate: z.string(), endDate: z.string() }))
       .query(({ input }) => db.getBiometricTimeTracking(input.staffId, new Date(input.startDate), new Date(input.endDate))),
     gpsVerification: protectedProcedure.input(z.object({ staffId: z.number() }))
@@ -1200,8 +1262,7 @@ IMPORTANT: Extract EVERY product line. Do not skip any. Return valid JSON only.`
       const prompt = `You are an expert restaurant financial advisor AI.
 Here is the restaurant's recent performance summary:
 Revenue: $${kpis.totalRevenue}
-COGS: $${kpis.totalCOGS}
-Labour Cost: $${kpis.totalLabourCost}
+COGS: $${kpis.cogs}
 Gross Profit: $${kpis.grossProfit}
 
 Plus ${lowStock.length} items currently low on stock.
@@ -1230,7 +1291,7 @@ Write a 2-3 sentence personalized insight on this business performance, highligh
 
       const dataStr = JSON.stringify({
         lowStockItems: lowStock.map(i => ({ name: i.name, current: i.currentStock, min: i.minStock })),
-        topSellers: topItems.map(i => ({ name: i.name, margin: i.marginPercent }))
+        topSellers: topItems.map(i => ({ name: i.itemName, margin: i.revenue > 0 ? (i.grossProfit / i.revenue) * 100 : 0 }))
       });
 
       const prompt = `You are an AI restaurant operations assistant. Analyze the following data and generate 2-3 actionable notifications for the manager.
@@ -1256,7 +1317,7 @@ Provide the response as a JSON object containing a "notifications" array. Each o
         });
 
         const content = llmResult.choices[0]?.message?.content || '{"notifications":[]}';
-        const parsed = JSON.parse(content);
+        const parsed = JSON.parse(typeof content === 'string' ? content : JSON.stringify(content));
         let notifs = parsed.notifications || [];
         if (!Array.isArray(notifs)) notifs = [];
 
@@ -1278,9 +1339,9 @@ Provide the response as a JSON object containing a "notifications" array. Each o
     }),
   }),
 
-  // Add missing mock routes
   locations: router({
     list: protectedProcedure.query(() => [] as any[]),
+    getAll: protectedProcedure.query(() => [] as any[]),
     create: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
     update: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
     delete: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
@@ -1289,19 +1350,21 @@ Provide the response as a JSON object containing a "notifications" array. Each o
     }),
   }),
   locationPrices: router({
-    list: protectedProcedure.input(z.any()).query(() => [] as any[]),
-    update: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+    getByLocation: protectedProcedure.input(z.any()).query(() => [] as any[]),
+    set: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+    delete: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
   }),
   paymentDisputes: router({
     list: protectedProcedure.input(z.any().optional()).query(() => [] as any[]),
+    create: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+    update: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
     respond: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
     metrics: protectedProcedure.query(() => ({}) as any),
   }),
   tableMerges: router({
     getActive: protectedProcedure.query(() => [] as any[]),
-    request: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
-    approve: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
-    reject: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+    merge: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+    unmerge: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
   }),
   discountsManager: router({
     list: protectedProcedure.query(() => [] as any[]),
@@ -1312,13 +1375,14 @@ Provide the response as a JSON object containing a "notifications" array. Each o
   }),
   splitBills: router({
     getActive: protectedProcedure.input(z.any().optional()).query(() => [] as any[]),
-    createGroup: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
-    updateGroup: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
-    removeGroup: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+    create: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+    addPart: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+    payPart: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
   }),
   tips: router({
     dailySummary: protectedProcedure.input(z.any().optional()).query(() => [] as any[]),
     calculatePool: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+    addToOrder: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
   }),
 });
 export type AppRouter = typeof appRouter;

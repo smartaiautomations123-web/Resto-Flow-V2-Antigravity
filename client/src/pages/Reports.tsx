@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useState, useMemo } from "react";
-import { DollarSign, TrendingUp, Users, ShoppingCart, Clock, Award, Download } from "lucide-react";
+import { DollarSign, TrendingUp, Users, ShoppingCart, Clock, Award, Download, Sparkles } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Reports() {
   const [dateRange, setDateRange] = useState(() => {
@@ -27,6 +28,7 @@ export default function Reports() {
   const { data: byType } = trpc.reports.ordersByType.useQuery({ dateFrom: stableDateRange.from, dateTo: stableDateRange.to });
   const { data: hourlyTrend } = trpc.salesAnalytics.hourlySalesTrend.useQuery({ date: hourlyDate });
   const { data: staffPerf } = trpc.salesAnalytics.staffPerformance.useQuery({ startDate: stableDateRange.from, endDate: stableDateRange.to });
+  const { data: aiInsights, isLoading: isLoadingAI } = trpc.reports.getSmartReportingInsights.useQuery({ dateFrom: stableDateRange.from, dateTo: stableDateRange.to });
 
   const totalLabour = labourCosts?.totalLabourCost || 0;
   const revenue = Number(stats?.totalRevenue || 0);
@@ -58,6 +60,33 @@ export default function Reports() {
           <div><Label className="text-xs">To</Label><Input type="date" value={dateRange.to} onChange={e => setDateRange(p => ({ ...p, to: e.target.value }))} className="w-36" /></div>
         </div>
       </div>
+
+      {/* AI Dashboard Insight Card */}
+      <Card className="overflow-hidden border-none bg-gradient-to-br from-primary/10 via-background to-secondary/10 animate-fade-in">
+        <CardContent className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="p-2 rounded-lg bg-primary/20">
+              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-semibold text-primary flex items-center gap-2">
+                Smart Business AI Insight
+                <Badge variant="secondary" className="text-[10px] uppercase tracking-wider px-1.5 h-4 bg-primary/20 text-primary border-none">Analysis Active</Badge>
+              </h3>
+              {isLoadingAI ? (
+                <div className="space-y-2 mt-2">
+                  <Skeleton className="h-4 w-[250px]" />
+                  <Skeleton className="h-4 w-[200px]" />
+                </div>
+              ) : (
+                <p className="text-sm text-foreground/80 leading-relaxed italic">
+                  "{aiInsights?.insight}"
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

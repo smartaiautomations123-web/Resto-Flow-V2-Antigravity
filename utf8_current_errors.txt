@@ -1,0 +1,6 @@
+﻿> client/src/pages/Dashboard.tsx(111,17): error TS2322: Type 'string | (TextContent | ImageContent | FileContent)[]' is not assignable to type 'ReactNode'.
+    Type '(TextContent | ImageContent | FileContent)[]' is not assignable to type 'ReactNode'.
+      Type '(TextContent | ImageContent | FileContent)[]' is not assignable to type 'Iterable<ReactNode>'.
+        The types returned by '[Symbol.iterator]().next(...)' are incompatible between these types.
+          Type 'IteratorResult<TextContent | ImageContent | FileContent, undefined>' is not assignable to type 'IteratorResult<ReactNode, any>'.
+            Type 'IteratorYieldResult<TextContent | ImageContent | FileContent>' is not assignable to type 'IteratorResult<ReactNode, any>'.

@@ -65,7 +65,7 @@ export default function CustomerSegments() {
       // Add recipients if segment selected
       if (selectedSegmentId && segmentMembers) {
         const campaignId = (result as any).insertId;
-        const customerIds = segmentMembers.map((m) => m.id);
+        const customerIds = segmentMembers.map((m) => m.id).filter((id): id is number => id !== null);
         addRecipientsMutation.mutate({ campaignId, customerIds });
       }
     },

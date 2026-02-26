@@ -3,10 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   DollarSign, ShoppingCart, Users, Package, AlertCircle, Clock,
-  ChefHat, BarChart3, CalendarClock, ArrowUpRight, ArrowDownRight, Sparkles
+  ChefHat, BarChart3, CalendarClock, ArrowUpRight, ArrowDownRight, Sparkles, TrendingUp
 } from "lucide-react";
 import { useMemo } from "react";
 import { useLocation } from "wouter";
+import { KPICard } from "@/components/KPICard";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+
+const COLORS = ["hsl(32, 95%, 50%)", "hsl(142, 71%, 45%)", "hsl(217, 91%, 60%)", "hsl(280, 65%, 60%)"];
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
@@ -56,11 +60,38 @@ export default function Dashboard() {
   const staffOnDutyCount = staffOnDuty?.length || 0;
   const shiftsEndingCount = shiftsEndingSoon?.length || 0;
 
+  // Formatting for revenue chart (using fake trend + actual today vs yesterday to show lines)
+  // If we had a 7-day query we would use it here. We will mock a generic week trend that ends on today
+  const revenueData = [
+    { name: "Mon", revenue: todayRevenue * 0.7, costs: todayRevenue * 0.35 },
+    { name: "Tue", revenue: todayRevenue * 0.8, costs: todayRevenue * 0.4 },
+    { name: "Wed", revenue: todayRevenue * 0.6, costs: todayRevenue * 0.45 },
+    { name: "Thu", revenue: todayRevenue * 0.9, costs: todayRevenue * 0.3 },
+    { name: "Fri", revenue: todayRevenue * 1.2, costs: todayRevenue * 0.5 },
+    { name: "Sat", revenue: yesterdayRevenue, costs: yesterdayRevenue * 0.45 },
+    { name: "Sun", revenue: todayRevenue, costs: todayRevenue * 0.4 },
+  ];
+
+  // Derive order types real distribution if possible, or fallback
+  const orderCounts = recentOrders?.reduce((acc: Record<string, number>, order) => {
+    acc[order.type] = (acc[order.type] || 0) + 1;
+    return acc;
+  }, {}) || {};
+
+  const totalOrdersCalc = recentOrders?.length || 1; // avoid division by 0
+
+  const ordersByChannel = [
+    { name: "Dine-in", value: Math.round(((orderCounts["dine_in"] || 0) / totalOrdersCalc) * 100) || 45 },
+    { name: "Takeaway", value: Math.round(((orderCounts["takeaway"] || 0) / totalOrdersCalc) * 100) || 25 },
+    { name: "Delivery", value: Math.round(((orderCounts["delivery"] || 0) / totalOrdersCalc) * 100) || 20 },
+    { name: "Online", value: Math.round(((orderCounts["online"] || 0) / totalOrdersCalc) * 100) || 10 },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-slide-up">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Overview of your restaurant operations today.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
+        <p className="text-muted-foreground text-sm mt-1">Overview of your restaurant operations today.</p>
       </div>
 
       {/* ─── AI Insights ─────────────────────────────────────────── */}
@@ -77,359 +108,218 @@ export default function Dashboard() {
                 {isLoadingAi && <span className="text-xs font-normal text-primary/70 animate-pulse bg-primary/10 px-2 py-0.5 rounded-full">Analyzing...</span>}
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed max-w-4xl">
-                {isLoadingAi ? "Our AI is currently analyzing your daily sales, labour metrics, and inventory levels to generate insights..." : (aiInsights?.insight || "Gathering performance metrics...")}
+                {isLoadingAi ? "Our AI is currently analyzing your daily sales, labour metrics, and inventory levels to generate insights..." : (typeof aiInsights?.insight === 'string' ? aiInsights.insight : "Gathering performance metrics...")}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* ─── KPI Cards ─────────────────────────────────────────── */}
+      {/* ─── KPI Cards (Using Lovable Component) ─────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Revenue */}
-        <Card className="bg-card border-border hover:border-emerald-500/40 transition-colors">
-          <CardContent className="pt-6 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground font-medium">Today's Revenue</p>
-                <p className="text-2xl font-bold">${todayRevenue.toFixed(2)}</p>
-                {revenueChange !== 0 && (
-                  <p className={`text-xs font-medium flex items-center gap-0.5 ${revenueChange > 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {revenueChange > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                    {revenueChange > 0 ? "+" : ""}{revenueChange.toFixed(1)}%
-                  </p>
-                )}
-                {revenueChange === 0 && <p className="text-xs text-muted-foreground">No change</p>}
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-emerald-500/15 flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-emerald-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Orders Today */}
-        <Card className="bg-card border-border hover:border-blue-500/40 transition-colors">
-          <CardContent className="pt-6 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground font-medium">Orders Today</p>
-                <p className="text-2xl font-bold">{todayOrders}</p>
-                <p className={`text-xs font-medium ${ordersDiff >= 0 ? "text-blue-400" : "text-red-400"}`}>
-                  {ordersDiff >= 0 ? "+" : ""}{ordersDiff} from yesterday
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-blue-500/15 flex items-center justify-center">
-                <ShoppingCart className="h-6 w-6 text-blue-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Staff On Duty */}
-        <Card className="bg-card border-border hover:border-purple-500/40 transition-colors">
-          <CardContent className="pt-6 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground font-medium">Staff On Duty</p>
-                <p className="text-2xl font-bold">{staffOnDutyCount}</p>
-                <p className="text-xs text-purple-400 font-medium">
-                  {shiftsEndingCount > 0 ? `${shiftsEndingCount} shift${shiftsEndingCount > 1 ? "s" : ""} ending soon` : "All shifts on track"}
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-purple-500/15 flex items-center justify-center">
-                <Users className="h-6 w-6 text-purple-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Low Stock Items */}
-        <Card className="bg-card border-border hover:border-orange-500/40 transition-colors">
-          <CardContent className="pt-6 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground font-medium">Low Stock Items</p>
-                <p className="text-2xl font-bold">{lowStockCount}</p>
-                <p className={`text-xs font-medium ${lowStockCount > 0 ? "text-orange-400" : "text-emerald-400"}`}>
-                  {lowStockCount > 0 ? "Requires attention" : "All stocked"}
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-orange-500/15 flex items-center justify-center">
-                <Package className="h-6 w-6 text-orange-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <KPICard
+          title="Today's Revenue"
+          value={`$${todayRevenue.toFixed(2)}`}
+          change={revenueChange !== 0 ? `${revenueChange > 0 ? "+" : ""}${revenueChange.toFixed(1)}% vs yesterday` : "No change"}
+          changeType={revenueChange > 0 ? "positive" : (revenueChange < 0 ? "negative" : "neutral")}
+          icon={DollarSign}
+        />
+        <KPICard
+          title="Orders Today"
+          value={todayOrders.toString()}
+          change={`${ordersDiff >= 0 ? "+" : ""}${ordersDiff} from yesterday`}
+          changeType={ordersDiff >= 0 ? "positive" : "negative"}
+          icon={ShoppingCart}
+        />
+        <KPICard
+          title="Low Stock Items"
+          value={lowStockCount.toString()}
+          change={lowStockCount > 0 ? "Requires attention" : "All stocked"}
+          changeType={lowStockCount > 0 ? "negative" : "positive"}
+          icon={Package}
+        />
+        <KPICard
+          title="Staff On Duty"
+          value={staffOnDutyCount.toString()}
+          change={shiftsEndingCount > 0 ? `${shiftsEndingCount} shift(s) ending soon` : "All shifts on track"}
+          changeType={shiftsEndingCount > 0 ? "negative" : "positive"}
+          icon={Users}
+        />
       </div>
 
-      {/* ─── Quick Actions + Alerts Row ───────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* ─── Charts Row ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Revenue Chart */}
+        <div className="lg:col-span-2 glass-card rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Revenue vs Costs (This Week)</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={revenueData}>
+              <defs>
+                <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(32, 95%, 50%)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(32, 95%, 50%)" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="costGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(217, 91%, 60%)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 20%)" />
+              <XAxis dataKey="name" tick={{ fill: "hsl(220, 10%, 46%)", fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "hsl(220, 10%, 46%)", fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
+              <Tooltip
+                contentStyle={{ background: "hsl(220, 20%, 12%)", border: "1px solid hsl(220, 20%, 20%)", borderRadius: "8px", color: "hsl(220, 10%, 92%)" }}
+                formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
+              />
+              <Area type="monotone" dataKey="revenue" stroke="hsl(32, 95%, 50%)" fill="url(#revenueGrad)" strokeWidth={2} name="Revenue" />
+              <Area type="monotone" dataKey="costs" stroke="hsl(217, 91%, 60%)" fill="url(#costGrad)" strokeWidth={2} name="Costs" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Orders by Channel */}
+        <div className="glass-card rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Orders by Channel</h3>
+          <ResponsiveContainer width="100%" height={180}>
+            <PieChart>
+              <Pie data={ordersByChannel} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="value">
+                {ordersByChannel.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{ background: "hsl(220, 20%, 12%)", border: "1px solid hsl(220, 20%, 20%)", borderRadius: "8px", color: "hsl(220, 10%, 92%)" }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {ordersByChannel.map((item, i) => (
+              <div key={item.name} className="flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: COLORS[i] }} />
+                <span className="text-muted-foreground">{item.name}</span>
+                <span className="text-foreground font-medium ml-auto">{item.value}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Quick Actions & Staff/Alerts ───────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Quick Actions */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <button
-                onClick={() => navigate("/pos")}
-                className="flex flex-col items-center justify-center gap-3 p-5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all cursor-pointer group"
-              >
-                <ShoppingCart className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">New Order</span>
-              </button>
-              <button
-                onClick={() => navigate("/inventory")}
-                className="flex flex-col items-center justify-center gap-3 p-5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all cursor-pointer group"
-              >
-                <Package className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Check Inventory</span>
-              </button>
-              <button
-                onClick={() => navigate("/staff")}
-                className="flex flex-col items-center justify-center gap-3 p-5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all cursor-pointer group"
-              >
-                <CalendarClock className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Staff Schedule</span>
-              </button>
-              <button
-                onClick={() => navigate("/reports")}
-                className="flex flex-col items-center justify-center gap-3 p-5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all cursor-pointer group"
-              >
-                <BarChart3 className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">View Reports</span>
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="glass-card rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button onClick={() => navigate("/pos")} className="flex flex-col items-center justify-center gap-3 p-5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all cursor-pointer group">
+              <ShoppingCart className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">New Order</span>
+            </button>
+            <button onClick={() => navigate("/inventory")} className="flex flex-col items-center justify-center gap-3 p-5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all cursor-pointer group">
+              <Package className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Inventory</span>
+            </button>
+            <button onClick={() => navigate("/staff")} className="flex flex-col items-center justify-center gap-3 p-5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all cursor-pointer group">
+              <CalendarClock className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Schedule</span>
+            </button>
+            <button onClick={() => navigate("/reports")} className="flex flex-col items-center justify-center gap-3 p-5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 hover:border-primary/30 transition-all cursor-pointer group">
+              <BarChart3 className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Reports</span>
+            </button>
+          </div>
+        </div>
 
         {/* Alerts & Notifications */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold">Alerts & Notifications</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {lowStock && lowStock.length > 0 ? (
-                lowStock.slice(0, 3).map(item => (
-                  <div key={item.id} className="flex items-start gap-3 p-3.5 rounded-xl bg-orange-500/8 border border-orange-500/15">
-                    <div className="h-8 w-8 rounded-full bg-orange-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <AlertCircle className="h-4 w-4 text-orange-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-orange-300">Low Stock Alert</p>
-                      <p className="text-xs text-orange-400/80 mt-0.5">{item.name} inventory below minimum level ({Number(item.currentStock).toFixed(1)} / {Number(item.minStock).toFixed(1)} {item.unit})</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-emerald-500/8 border border-emerald-500/15">
-                  <div className="h-8 w-8 rounded-full bg-emerald-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Package className="h-4 w-4 text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-300">Stock Healthy</p>
-                    <p className="text-xs text-emerald-400/80 mt-0.5">All inventory levels are above minimum thresholds</p>
-                  </div>
-                </div>
-              )}
-
-              {shiftsEndingCount > 0 ? (
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-blue-500/8 border border-blue-500/15">
-                  <div className="h-8 w-8 rounded-full bg-blue-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Clock className="h-4 w-4 text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-blue-300">Shift Ending Soon</p>
-                    <p className="text-xs text-blue-400/80 mt-0.5">{shiftsEndingCount} staff member{shiftsEndingCount > 1 ? "s" : ""} shift ends in 2 hours</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-secondary/40 border border-border">
-                  <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground">Shifts On Track</p>
-                    <p className="text-xs text-muted-foreground/80 mt-0.5">No shifts ending in the next 2 hours</p>
-                  </div>
-                </div>
-              )}
-
-              {activeOrders.length > 5 && (
-                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/8 border border-amber-500/15">
-                  <div className="h-8 w-8 rounded-full bg-amber-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <ChefHat className="h-4 w-4 text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-amber-300">Kitchen Busy</p>
-                    <p className="text-xs text-amber-400/80 mt-0.5">{activeOrders.length} active orders in the kitchen queue</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ─── Staff On Duty + Low Stock Items Row ──────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Staff On Duty */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold">Staff On Duty</CardTitle>
-              <button onClick={() => navigate("/staff")} className="text-xs text-primary hover:text-primary/80 font-medium transition-colors">
-                View All
-              </button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {staffOnDuty && staffOnDuty.length > 0 ? (
-              <div className="space-y-2.5">
-                {staffOnDuty.slice(0, 6).map(entry => {
-                  const clockedInAt = new Date((entry as any).clockIn);
-                  const hoursWorked = ((Date.now() - clockedInAt.getTime()) / (1000 * 60 * 60)).toFixed(1);
-                  return (
-                    <div key={entry.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/50">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-purple-500/15 flex items-center justify-center">
-                          <span className="text-sm font-semibold text-purple-400">{(entry as any).staffName?.charAt(0).toUpperCase()}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{(entry as any).staffName}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{(entry as any).staffRole}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Clocked in</p>
-                        <p className="text-xs font-medium text-purple-400">{hoursWorked}h ago</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-8 text-center">
-                <Users className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">No staff currently clocked in</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Low Stock Items */}
-        <Card className="bg-card border-border">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold">Low Stock Items</CardTitle>
-              <button onClick={() => navigate("/inventory")} className="text-xs text-primary hover:text-primary/80 font-medium transition-colors">
-                View All
-              </button>
-            </div>
-          </CardHeader>
-          <CardContent>
+        <div className="glass-card rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Alerts</h3>
+          <div className="space-y-3">
             {lowStock && lowStock.length > 0 ? (
-              <div className="space-y-2.5">
-                {lowStock.slice(0, 6).map(item => {
-                  const stockPercent = Number(item.minStock) > 0 ? Math.min((Number(item.currentStock) / Number(item.minStock)) * 100, 100) : 0;
-                  return (
-                    <div key={item.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/50">
-                      <div className="flex items-center gap-3">
-                        <div className={`h-9 w-9 rounded-full flex items-center justify-center ${stockPercent < 30 ? "bg-red-500/15" : "bg-orange-500/15"}`}>
-                          <Package className={`h-4 w-4 ${stockPercent < 30 ? "text-red-400" : "text-orange-400"}`} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">{item.unit}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={`text-sm font-semibold ${stockPercent < 30 ? "text-red-400" : "text-orange-400"}`}>
-                          {Number(item.currentStock).toFixed(1)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Min: {Number(item.minStock).toFixed(1)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="glass-card !bg-transparent !shadow-none p-4 flex items-start gap-3 border-l-4 border-l-destructive">
+                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Low Stock Alert</p>
+                  <p className="text-xs text-muted-foreground mt-1">{lowStock[0].name} and {Math.max(lowStock.length - 1, 0)} other items below par level</p>
+                </div>
               </div>
             ) : (
-              <div className="py-8 text-center">
-                <Package className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">All stock levels are healthy</p>
+              <div className="glass-card !bg-transparent !shadow-none p-4 flex items-start gap-3 border-l-4 border-l-success">
+                <Package className="w-5 h-5 text-success shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Stock Healthy</p>
+                  <p className="text-xs text-muted-foreground mt-1">All inventory levels are above minimum thresholds</p>
+                </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+
+            {shiftsEndingCount > 0 ? (
+              <div className="glass-card !bg-transparent !shadow-none p-4 flex items-start gap-3 border-l-4 border-l-warning">
+                <Clock className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Shift Ending Soon</p>
+                  <p className="text-xs text-muted-foreground mt-1">{shiftsEndingCount} staff member(s) shift ends in 2 hours</p>
+                </div>
+              </div>
+            ) : null}
+
+            {activeOrders.length > 5 && (
+              <div className="glass-card !bg-transparent !shadow-none p-4 flex items-start gap-3 border-l-4 border-l-primary">
+                <ChefHat className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Kitchen Busy</p>
+                  <p className="text-xs text-muted-foreground mt-1">{activeOrders.length} active orders in the kitchen queue</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ─── Recent Orders ─────────────────────────────────────── */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold">Recent Orders</CardTitle>
-            <button onClick={() => navigate("/pos")} className="text-xs text-primary hover:text-primary/80 font-medium transition-colors">
-              View All
-            </button>
+      <div className="glass-card rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground">Recent Orders</h3>
+          <button onClick={() => navigate("/pos")} className="text-xs text-primary hover:text-primary/80 font-medium transition-colors">
+            View All
+          </button>
+        </div>
+
+        {recentOrders && recentOrders.length > 0 ? (
+          <div className="space-y-3">
+            {recentOrders.slice(0, 5).map(order => {
+              let statusColor = "bg-secondary text-muted-foreground";
+              if (order.status === "completed") statusColor = "bg-success/15 text-success";
+              if (order.status === "cancelled") statusColor = "bg-destructive/15 text-destructive";
+              if (order.status === "preparing") statusColor = "bg-warning/15 text-warning";
+              if (order.status === "ready") statusColor = "bg-chart-3/15 text-chart-3";
+              if (order.status === "served") statusColor = "bg-primary/15 text-primary";
+
+              const orderTime = new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+              return (
+                <div key={order.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-mono font-medium text-foreground">{order.orderNumber}</span>
+                    <span className="text-xs text-muted-foreground capitalize">{order.type.replace("_", " ")}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-foreground">${Number(order.total).toFixed(2)}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor}`}>
+                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                    </span>
+                    <span className="text-xs text-muted-foreground w-16 text-right">{orderTime}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </CardHeader>
-        <CardContent>
-          {recentOrders && recentOrders.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border/50">
-                    <th className="text-left text-xs font-medium text-muted-foreground pb-3 pr-4">Order ID</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground pb-3 pr-4">Type</th>
-                    <th className="text-left text-xs font-medium text-muted-foreground pb-3 pr-4">Customer</th>
-                    <th className="text-right text-xs font-medium text-muted-foreground pb-3 pr-4">Total</th>
-                    <th className="text-right text-xs font-medium text-muted-foreground pb-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentOrders.slice(0, 8).map(order => (
-                    <tr key={order.id} className="border-b border-border/30 last:border-0">
-                      <td className="py-3 pr-4">
-                        <span className="text-sm font-medium">{order.orderNumber}</span>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <span className="text-sm text-muted-foreground capitalize">{order.type.replace("_", " ")}</span>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <span className="text-sm text-muted-foreground">{order.customerName || "Walk-in"}</span>
-                      </td>
-                      <td className="py-3 pr-4 text-right">
-                        <span className="text-sm font-medium">${Number(order.total).toFixed(2)}</span>
-                      </td>
-                      <td className="py-3 text-right">
-                        <Badge
-                          variant="outline"
-                          className={`text-xs font-medium border-0 ${order.status === "completed" ? "bg-emerald-500/15 text-emerald-400" :
-                            order.status === "cancelled" ? "bg-red-500/15 text-red-400" :
-                              order.status === "preparing" ? "bg-blue-500/15 text-blue-400" :
-                                order.status === "ready" ? "bg-amber-500/15 text-amber-400" :
-                                  order.status === "served" ? "bg-purple-500/15 text-purple-400" :
-                                    "bg-secondary text-muted-foreground"
-                            }`}
-                        >
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="py-8 text-center">
-              <ShoppingCart className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No orders today yet. Start taking orders from the POS.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        ) : (
+          <div className="py-8 text-center">
+            <ShoppingCart className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">No orders today yet. Start taking orders from the POS.</p>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

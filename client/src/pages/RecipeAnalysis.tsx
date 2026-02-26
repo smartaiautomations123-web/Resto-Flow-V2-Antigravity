@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import {
-  ChefHat, TrendingUp, DollarSign, Package, BarChart2, RefreshCw
+  ChefHat, TrendingUp, DollarSign, Package, BarChart2, RefreshCw, Sparkles
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -34,6 +34,11 @@ export default function RecipeAnalysis() {
   const { data: costAnalysis } = trpc.menu.getCostAnalysis.useQuery(
     { menuItemId },
     { enabled: !!selectedItemId }
+  );
+
+  const { data: aiInsights, isLoading: loadingAi } = trpc.recipeCostAnalysis.getSmartMenuInsights.useQuery(
+    { menuItemId },
+    { enabled: !!selectedItemId, staleTime: 5 * 60 * 1000, retry: false }
   );
 
   const costHistory: any[] = [];
@@ -124,6 +129,27 @@ export default function RecipeAnalysis() {
         </Card>
       ) : (
         <>
+          {/* AI Smart Insight */}
+          <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#221F26] border-[#333333] shadow-lg relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4 relaitve z-10">
+                <div className="min-w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-1">
+                    AI Menu Engineering Insight
+                    {loadingAi && <span className="text-xs font-normal text-primary/70 animate-pulse bg-primary/10 px-2 py-0.5 rounded-full">Analyzing...</span>}
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed max-w-4xl">
+                    {loadingAi ? "Analyzing recipe margins and ingredient costs to suggest optimizations..." : (typeof aiInsights?.insight === 'string' ? aiInsights.insight : "Connecting to engineering engine...")}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* KPI cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card className="bg-card border-border">
