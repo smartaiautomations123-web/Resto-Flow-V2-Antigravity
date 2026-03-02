@@ -1134,7 +1134,7 @@ export type InsertCurrencySettings = typeof currencySettings.$inferInsert;
 // ─── Integrations ───────────────────────────────────────────────────
 export const integrations = mysqlTable("integrations", {
   id: int("id").autoincrement().primaryKey(),
-  type: mysqlEnum("type", ["slack", "teams", "quickbooks", "stripe", "square", "paypal", "uber_eats", "doordash", "grubhub", "webhook"]).notNull(),
+  type: mysqlEnum("type", ["slack", "teams", "quickbooks", "stripe", "square", "paypal", "uber_eats", "doordash", "grubhub", "webhook", "toast", "xtra_chef"]).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   isEnabled: boolean("isEnabled").default(true).notNull(),
   apiKey: text("apiKey"),
@@ -1248,3 +1248,20 @@ export const forecastingData = mysqlTable("forecasting_data", {
 });
 export type ForecastingData = typeof forecastingData.$inferSelect;
 export type InsertForecastingData = typeof forecastingData.$inferInsert;
+
+// ─── Data Import Jobs ───────────────────────────────────────────────
+export const dataImportJobs = mysqlTable("data_import_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  type: varchar("type", { length: 50 }).notNull(), // 'menu', 'customers', 'inventory', etc.
+  status: mysqlEnum("status", ["pending", "processing", "completed", "failed"]).default("pending").notNull(),
+  fileUrl: text("fileUrl"), // URL to the uploaded file in blob storage
+  totalRecords: int("totalRecords").default(0),
+  processedRecords: int("processedRecords").default(0),
+  failedRecords: int("failedRecords").default(0),
+  errorMessage: text("errorMessage"),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type DataImportJob = typeof dataImportJobs.$inferSelect;
+export type InsertDataImportJob = typeof dataImportJobs.$inferInsert;

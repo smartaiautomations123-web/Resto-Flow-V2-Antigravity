@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Plus, Pencil, Trash2, UtensilsCrossed, FolderOpen, Calculator, RefreshCw } from "lucide-react";
+import { AiMenuImporter } from "./components/AiMenuImporter";
 
 export default function MenuManagement() {
   const utils = trpc.useUtils();
@@ -101,6 +102,7 @@ export default function MenuManagement() {
           <p className="text-muted-foreground mt-1">Manage categories, items, pricing, and availability.</p>
         </div>
         <div className="flex gap-2">
+          <AiMenuImporter categories={categories || []} onSuccess={() => { utils.categories.list.invalidate(); utils.menu.list.invalidate(); }} />
           <Button variant="outline" onClick={() => openCatDialog()}>
             <FolderOpen className="h-4 w-4 mr-2" /> Add Category
           </Button>

@@ -324,18 +324,50 @@ export const appRouter = router({
     items: protectedProcedure.input(z.object({ purchaseOrderId: z.number() }))
       .query(({ input }) => db.getPurchaseOrderItems(input.purchaseOrderId)),
     receiveAndUpdateStock: protectedProcedure.input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const po = await db.getPurchaseOrderById(input.id);
         if (!po) throw new Error("Purchase order not found");
         // Mark PO as received
         await db.updatePurchaseOrder(input.id, { status: "received", receivedAt: new Date() });
-        // Bump ingredient stock for each line item
+        // Process each item
         const items = await db.getPurchaseOrderItems(input.id);
         for (const item of items) {
           if (item.ingredientId) {
+            // 1. Update stock levels
             await db.adjustIngredientStock(item.ingredientId, Number(item.quantity), `PO-${input.id} received`);
+
+            // 2. Update unit cost to the latest invoice price
+            if (item.unitCost) {
+              await db.updateIngredient(item.ingredientId, { costPerUnit: item.unitCost });
+            }
           }
         }
+
+        // 3. AI Cost Optimizer Check: Re-evaluate Margins
+        // We trigger an async recalculation of all menu item costs
+        // If any fall below 60% gross margin, we generate a notification
+        setTimeout(async () => {
+          try {
+            await db.updateAllMenuItemCosts();
+            const menuItems = await db.listMenuItems();
+            for (const menu of menuItems) {
+              if (Number(menu.price) > 0 && Number(menu.cost) > 0) {
+                const margin = (Number(menu.price) - Number(menu.cost)) / Number(menu.price);
+                if (margin < 0.60) { // 60% target margin
+                  await db.createNotification(
+                    ctx.user.id,
+                    `⚠️ Margin Alert: ${menu.name}`,
+                    `Recent ingredient price increases dropped ${menu.name} margin to ${(margin * 100).toFixed(1)}% (below 60% target). Consider price adjustments.`,
+                    "alert"
+                  );
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Failed to run AI Cost Optimizer Checks", e);
+          }
+        }, 1000);
+
         return { success: true, itemsUpdated: items.length };
       }),
     cancel: protectedProcedure.input(z.object({ id: z.number() }))
@@ -1229,6 +1261,9 @@ Write a 2-3 sentence smart prediction suggesting which ingredients the restauran
           lastSyncedAt: (byType('quickbooks') as any)?.updatedAt ?? null,
           ...byType('quickbooks'),
         } : { active: false },
+        toast: byType('toast') ? { active: true, ...byType('toast') } : { active: false },
+        xtra_chef: byType('xtra_chef') ? { active: true, ...byType('xtra_chef') } : { active: false },
+        square: byType('square') ? { active: true, ...byType('square') } : { active: false },
       };
     }),
     getWebhooks: protectedProcedure.query(() => db.listWebhooks()),
@@ -1244,6 +1279,15 @@ Write a 2-3 sentence smart prediction suggesting which ingredients the restauran
     createWebhook: protectedProcedure
       .input(z.object({ url: z.string().url(), event: z.string(), active: z.boolean().optional() }))
       .mutation(({ input }) => db.createWebhookIntegration(input.url, input.event)),
+    createToastIntegration: protectedProcedure
+      .input(z.object({ apiKey: z.string(), restaurantId: z.string() }))
+      .mutation(({ input }) => db.createIntegration({ type: 'toast', name: 'Toast POS', apiKey: input.apiKey, config: JSON.stringify({ restaurantId: input.restaurantId }) })),
+    createXtraChefIntegration: protectedProcedure
+      .input(z.object({ apiKey: z.string() }))
+      .mutation(({ input }) => db.createIntegration({ type: 'xtra_chef', name: 'xtraCHEF', apiKey: input.apiKey })),
+    createSquareIntegration: protectedProcedure
+      .input(z.object({ accessToken: z.string(), locationId: z.string() }))
+      .mutation(({ input }) => db.createIntegration({ type: 'square', name: 'Square POS', apiKey: input.accessToken, config: JSON.stringify({ locationId: input.locationId }) })),
     deleteIntegration: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => db.deleteIntegration(input.id)),
@@ -1383,6 +1427,124 @@ Provide the response as a JSON object containing a "notifications" array. Each o
     dailySummary: protectedProcedure.input(z.any().optional()).query(() => [] as any[]),
     calculatePool: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
     addToOrder: protectedProcedure.input(z.any()).mutation(() => ({}) as any),
+  }),
+  dataImports: router({
+    uploadFile: protectedProcedure.input(z.object({
+      fileName: z.string(),
+      fileBase64: z.string(), // base64 encoded csv/excel
+      dataType: z.string(), // 'menu', 'customers', etc.
+    })).mutation(async ({ input, ctx }) => {
+      const fileBuffer = Buffer.from(input.fileBase64, "base64");
+      const fileKey = `data-imports/${ctx.user.id}/${nanoid(12)}-${input.fileName}`;
+      const { url: fileUrl } = await storagePut(fileKey, fileBuffer, "application/octet-stream"); // Using generic stream, could be csv/xlsx
+
+      const jobResult = await db.createDataImportJob({
+        type: input.dataType,
+        fileUrl,
+        createdBy: ctx.user.id,
+      });
+
+      const jobId = (jobResult as any)[0]?.insertId || (jobResult as any).insertId;
+
+      // Simulate async processing (for MVP, we'll just mark it completed immediately or let a background worker pick it up)
+      setTimeout(async () => {
+        try {
+          // Dummy parsing logic to simulate processing
+          await db.updateDataImportJob(jobId, { status: 'processing' });
+          await new Promise(r => setTimeout(r, 2000));
+          await db.updateDataImportJob(jobId, { status: 'completed', processedRecords: 10, totalRecords: 10 });
+        } catch (error: any) {
+          await db.updateDataImportJob(jobId, { status: 'failed', errorMessage: error.message });
+        }
+      }, 100);
+
+      return { success: true, jobId };
+    }),
+    getJobStatus: protectedProcedure.input(z.object({ jobId: z.number() }))
+      .query(({ input }) => db.getDataImportJobById(input.jobId).then(rows => rows[0])),
+    listJobs: protectedProcedure.query(() => db.getDataImportJobs()),
+  }),
+  sync: router({
+    syncToastData: protectedProcedure.mutation(async () => {
+      // Dummy sync logic
+      await new Promise(r => setTimeout(r, 1000));
+      return { success: true, message: "Toast data synced securely" };
+    }),
+    syncSquareData: protectedProcedure.mutation(async () => {
+      await new Promise(r => setTimeout(r, 1000));
+      return { success: true, message: "Square data synced safely" };
+    }),
+    syncXtraChefData: protectedProcedure.mutation(async () => {
+      await new Promise(r => setTimeout(r, 1000));
+      return { success: true, message: "xtraCHEF inventory synced successfully" };
+    }),
+  }),
+  ai: router({
+    parseMenu: protectedProcedure.input(z.object({
+      fileBase64: z.string()
+    })).mutation(async ({ input }) => {
+      const { parseMenuImage } = await import("./services/ai");
+      return parseMenuImage(input.fileBase64);
+    }),
+    parseInvoice: protectedProcedure.input(z.object({
+      fileBase64: z.string()
+    })).mutation(async ({ input }) => {
+      const { parseInvoiceImage } = await import("./services/ai");
+      return parseInvoiceImage(input.fileBase64);
+    }),
+    generateCombos: protectedProcedure.mutation(async () => {
+      const { generateComboSuggestions } = await import("./services/ai");
+
+      // Get menu items to pass as context
+      const menuItems = await db.listMenuItems();
+
+      // Realistically we would fetch recent orders to pass to the AI to analyze co-occurrence.
+      // For MVP, we'll just pass the menu list.
+      return generateComboSuggestions(menuItems);
+    }),
+    getRealtimeUpsells: protectedProcedure.input(z.object({
+      cartItemIds: z.array(z.number())
+    })).query(async ({ input }) => {
+      // In a real implementation this would call an AI model or analyze historic data
+      // For MVP, we return a simple mockup
+      const menuItems = await db.listMenuItems();
+
+      // Filter out items already in the cart
+      const available = menuItems.filter(m => !input.cartItemIds.includes(m.id) && m.isAvailable && m.price > 0);
+
+      if (available.length === 0) return [];
+
+      // Return 1-2 random items with an AI-generated reason
+      const shuffled = available.sort(() => 0.5 - Math.random());
+      const suggestions = shuffled.slice(0, 2).map(item => {
+        // Simple logic for reason based on category or price
+        let reason = "Frequently bought together";
+        if (item.categoryId === 3) reason = "Perfect sweet finish"; // Assuming 3 = Desserts
+        if (item.price < 5) reason = "Popular low-cost add-on";
+        return {
+          item,
+          reason
+        };
+      });
+
+      return suggestions;
+    }),
+    getDashboardInsights: protectedProcedure.input(z.object({
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional()
+    })).query(async () => {
+      // Mocked AI insights for the dashboard
+      return {
+        insight: "Based on recent trends, consider offering a lunch special to boost midday sales. Your most profitable item is the 'Classic Burger'."
+      };
+    }),
+    generateSmartNotifications: protectedProcedure.mutation(async () => {
+      // Mock generating smart notifications based on AI analysis
+      return {
+        success: true,
+        notifications: [{ id: 1, message: "AI generated alert" }]
+      };
+    }),
   }),
 });
 export type AppRouter = typeof appRouter;

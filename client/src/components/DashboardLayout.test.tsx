@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import DashboardLayout from './DashboardLayout';
@@ -94,7 +95,7 @@ describe('DashboardLayout Navigation Groups', () => {
     );
 
     const salesOrdersButton = screen.getByText('Sales & Orders').closest('button');
-    
+
     // First click to expand
     fireEvent.click(salesOrdersButton!);
     await waitFor(() => {

@@ -36,7 +36,7 @@ import {
   deliverySettings, receiptSettings, securitySettings, apiKeys,
   auditLogSettings, backupSettings, localizationSettings, currencySettings,
   integrations, integrationLogs, customReports, reportExports,
-  analyticsDashboard, kpiMetrics, forecastingData,
+  analyticsDashboard, kpiMetrics, forecastingData, dataImportJobs
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -4897,3 +4897,29 @@ export async function getProfitabilityByShift(dateFrom: string, dateTo: string) 
     };
   });
 }
+
+// ─── DATA IMPORT JOBS ───────────────────────────────────────────────
+export async function createDataImportJob(data: {
+  type: string;
+  fileUrl?: string;
+  createdBy: number;
+}) {
+  const db = await getDb();
+  return await db.insert(dataImportJobs).values(data);
+}
+
+export async function getDataImportJobs(limit = 100) {
+  const db = await getDb();
+  return await db.select().from(dataImportJobs).orderBy(desc(dataImportJobs.createdAt)).limit(limit);
+}
+
+export async function getDataImportJobById(id: number) {
+  const db = await getDb();
+  return await db.select().from(dataImportJobs).where(eq(dataImportJobs.id, id)).limit(1);
+}
+
+export async function updateDataImportJob(id: number, data: any) {
+  const db = await getDb();
+  return await db.update(dataImportJobs).set({ ...data, updatedAt: new Date() }).where(eq(dataImportJobs.id, id));
+}
+

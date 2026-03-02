@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import {
   ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, Receipt,
-  Merge, Split, Percent, DollarSign, Tag,
+  Merge, Split, Percent, DollarSign, Tag, Sparkles
 } from "lucide-react";
 
 type CartItem = {
@@ -59,6 +59,9 @@ export default function POS() {
   const [showDiscountApproval, setShowDiscountApproval] = useState(false);
   const [pendingDiscount, setPendingDiscount] = useState<{ name: string; type: string; value: number; amount: number; requiresApproval: boolean } | null>(null);
   const [managerPin, setManagerPin] = useState("");
+
+  const cartItemIds = useMemo(() => cart.map(c => c.menuItemId), [cart]);
+  const { data: upsells } = trpc.ai.getRealtimeUpsells.useQuery({ cartItemIds }, { enabled: cart.length > 0 });
 
   const createOrder = trpc.orders.create.useMutation();
   const addItem = trpc.orders.addItem.useMutation();
@@ -384,6 +387,28 @@ export default function POS() {
               </div>
             )}
           </ScrollArea>
+
+          {/* AI Upsell Suggestions */}
+          {cart.length > 0 && upsells && upsells.length > 0 && (
+            <div className="mx-2 mt-2 mb-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg shrink-0">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center"><Sparkles className="h-3 w-3 mr-1" /> AI Suggests</span>
+              </div>
+              <div className="space-y-2">
+                {upsells.map((upsell, i) => (
+                  <div key={i} className="flex justify-between items-center bg-white p-2 rounded shadow-sm border border-indigo-100">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <p className="text-sm font-semibold truncate text-indigo-950">{upsell.item.name}</p>
+                      <p className="text-[10px] text-indigo-500 uppercase font-bold truncate">{upsell.reason}</p>
+                    </div>
+                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50 shrink-0" onClick={() => addToCart(upsell.item as any)}>
+                      + ${Number(upsell.item.price).toFixed(2)}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Totals */}
           {cart.length > 0 && (

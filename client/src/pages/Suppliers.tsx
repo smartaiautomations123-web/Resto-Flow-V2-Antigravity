@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Plus, Pencil, Trash2, Truck, FileText, Send, ChevronDown, ChevronUp, XCircle, Star } from "lucide-react";
+import { AiInvoiceScanner } from "./components/AiInvoiceScanner";
 
 export default function Suppliers() {
   const utils = trpc.useUtils();
@@ -94,6 +95,11 @@ export default function Suppliers() {
           <p className="text-muted-foreground mt-1">Manage suppliers and purchase orders.</p>
         </div>
         <div className="flex gap-2">
+          <AiInvoiceScanner
+            suppliers={suppliersList || []}
+            ingredients={ingredients || []}
+            onSuccess={() => utils.purchaseOrders.list.invalidate()}
+          />
           <Button variant="outline" onClick={() => { setPoForm({ supplierId: suppliersList?.[0]?.id ? String(suppliersList[0].id) : "", items: [{ ingredientId: "", quantity: "", unitCost: "" }], notes: "" }); setShowPODialog(true); }}>
             <FileText className="h-4 w-4 mr-2" /> New Purchase Order
           </Button>

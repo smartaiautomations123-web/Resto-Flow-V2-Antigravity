@@ -165,6 +165,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { icon: LayoutDashboard, label: "System Settings", path: "/settings" },
       { icon: Zap, label: "Integrations", path: "/integrations" },
+      { icon: Upload, label: "Data Imports", path: "/data-imports" },
       { icon: MapPin, label: "Locations", path: "/locations" },
       { icon: CreditCard, label: "Location Pricing", path: "/location-pricing" },
     ],
@@ -374,8 +375,8 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
                       <button
                         onClick={() => toggleGroup(group.id)}
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all font-medium text-sm group-data-[collapsible=icon]:justify-center ${hasActiveItem
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
                           }`}
                         aria-expanded={isExpanded}
                       >

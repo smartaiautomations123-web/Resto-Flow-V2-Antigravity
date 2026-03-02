@@ -48,6 +48,7 @@ import UnifiedOrderQueue from "./pages/UnifiedOrderQueue";
 const OrderQueue = UnifiedOrderQueue; // Alias for backward compatibility
 import Settings from "./pages/Settings";
 import Integrations from "./pages/Integrations";
+import DataImports from "./pages/DataImports";
 import CustomReportBuilder from "./pages/CustomReportBuilder";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import AuthPage from "./pages/Auth";
@@ -115,6 +116,7 @@ function Router() {
       {/* ─── Settings & Admin ─────────────────────── */}
       <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
       <Route path="/integrations" component={() => <DashboardLayout><Integrations /></DashboardLayout>} />
+      <Route path="/data-imports" component={() => <DashboardLayout><DataImports /></DashboardLayout>} />
       <Route path="/notifications" component={() => <DashboardLayout><NotificationCenter /></DashboardLayout>} />
       <Route path="/locations" component={() => <DashboardLayout><LocationManagement /></DashboardLayout>} />
       <Route path="/location-pricing" component={() => <DashboardLayout><LocationPricing /></DashboardLayout>} />

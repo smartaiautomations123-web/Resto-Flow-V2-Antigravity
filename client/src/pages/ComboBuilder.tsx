@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Layers, Tag, ShoppingBag, Percent } from "lucide-react";
+import { Plus, Trash2, Layers, Tag, ShoppingBag, Percent, Sparkles, Loader2 } from "lucide-react";
 
 export default function ComboBuilder() {
   const utils = trpc.useUtils();
@@ -16,6 +16,7 @@ export default function ComboBuilder() {
   // Combos are configured via UI but API endpoint is missing, mocked for UI demo
   const discounts: any[] = [];
   const { data: menuItems } = trpc.menu.list.useQuery();
+  const generateCombosMut = trpc.ai.generateCombos.useMutation();
 
   const createDiscount = {
     mutateAsync: async (d: any) => {
@@ -35,6 +36,9 @@ export default function ComboBuilder() {
     requiresApproval: false,
   });
 
+  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
+  const [showAiDialog, setShowAiDialog] = useState(false);
+
   const resetForm = () =>
     setForm({ name: "", type: "percentage", value: "", minOrderAmount: "", requiresApproval: false });
 
@@ -50,6 +54,31 @@ export default function ComboBuilder() {
       minOrderAmount: form.minOrderAmount || undefined,
       requiresApproval: form.requiresApproval,
     });
+  };
+
+  const handleAiSuggest = async () => {
+    setShowAiDialog(true);
+    if (aiSuggestions.length > 0) return; // Already generated
+
+    try {
+      const suggestions = await generateCombosMut.mutateAsync();
+      setAiSuggestions(suggestions.suggestions);
+    } catch (e: any) {
+      toast.error("Failed to generate combos. " + (e.message || ""));
+      setShowAiDialog(false);
+    }
+  };
+
+  const adoptAiCombo = (combo: any) => {
+    setForm({
+      name: combo.comboName,
+      type: "percentage",
+      value: "15", // Default to 15% off for AI combos
+      minOrderAmount: "",
+      requiresApproval: false,
+    });
+    setShowAiDialog(false);
+    setShowDialog(true);
   };
 
   // Filter to show combo-style discounts (not requiring manager approval = automatic deals)
@@ -72,21 +101,26 @@ export default function ComboBuilder() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Combo Builder</h1>
           <p className="text-muted-foreground mt-1">Create discounted combo deals and promotions for your menu.</p>
         </div>
-        <Button onClick={() => { resetForm(); setShowDialog(true); }}>
-          <Plus className="h-4 w-4 mr-2" /> New Combo Deal
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="border-indigo-200 text-indigo-700 hover:bg-indigo-50" onClick={handleAiSuggest}>
+            <Sparkles className="h-4 w-4 mr-2" /> AI Suggestions
+          </Button>
+          <Button onClick={() => { resetForm(); setShowDialog(true); }}>
+            <Plus className="h-4 w-4 mr-2" /> New Combo Deal
+          </Button>
+        </div>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
         <Card className="bg-card border-border">
-          <CardContent className="p-5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10"><Layers className="h-5 w-5 text-primary" /></div>
+          <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 shrink-0"><Layers className="h-5 w-5 text-primary" /></div>
             <div>
               <p className="text-sm text-muted-foreground">Total Combos</p>
               <p className="text-2xl font-bold">{combos.length}</p>
@@ -94,8 +128,8 @@ export default function ComboBuilder() {
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
-          <CardContent className="p-5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-success/10"><Tag className="h-5 w-5 text-success" /></div>
+          <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="p-2 rounded-lg bg-success/10 shrink-0"><Tag className="h-5 w-5 text-success" /></div>
             <div>
               <p className="text-sm text-muted-foreground">Active</p>
               <p className="text-2xl font-bold">{activeCount}</p>
@@ -103,8 +137,8 @@ export default function ComboBuilder() {
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
-          <CardContent className="p-5 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-warning/10"><ShoppingBag className="h-5 w-5 text-warning" /></div>
+          <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="p-2 rounded-lg bg-warning/10 shrink-0"><ShoppingBag className="h-5 w-5 text-warning" /></div>
             <div>
               <p className="text-sm text-muted-foreground">Menu Items</p>
               <p className="text-2xl font-bold">{menuItems?.length ?? 0}</p>
@@ -256,6 +290,58 @@ export default function ComboBuilder() {
             <Button onClick={handleCreate} disabled={createDiscount.isPending}>
               {createDiscount.isPending ? "Creating…" : "Create Combo Deal"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Suggestion Dialog */}
+      <Dialog open={showAiDialog} onOpenChange={setShowAiDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-indigo-600" />
+              AI Suggested Combos
+            </DialogTitle>
+            <div className="text-sm text-muted-foreground">
+              Based on historical ticket data and frequent co-purchases.
+            </div>
+          </DialogHeader>
+
+          {generateCombosMut.isPending ? (
+            <div className="py-12 flex flex-col items-center justify-center text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin mb-4 text-indigo-600" />
+              <p>Analyzing order history to find optimal combos...</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 mt-4">
+              {aiSuggestions.map((suggestion, idx) => (
+                <div key={idx} className="flex flex-col sm:flex-row gap-4 p-4 rounded-lg border bg-card hover:bg-accent/10 transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-semibold text-lg">{suggestion.comboName}</h4>
+                      <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100">
+                        High Conversion
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">{suggestion.reasoning}</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {suggestion.items.map((item: string, i: number) => (
+                        <Badge key={i} variant="outline" className="bg-background">{item}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-end justify-end sm:min-w-32 shrink-0 border-t sm:border-t-0 sm:border-l pt-3 sm:pt-0 sm:pl-3 border-border/50">
+                    <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => adoptAiCombo(suggestion)}>
+                      Adopt Combo
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAiDialog(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
