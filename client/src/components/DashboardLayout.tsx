@@ -151,6 +151,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { icon: BarChart3, label: "Reports", path: "/reports" },
       { icon: TrendingUp, label: "Profitability", path: "/profitability" },
+      { icon: TrendingUp, label: "Sales Forecasting", path: "/sales-forecasting" },
       { icon: Receipt, label: "Z-Reports", path: "/z-reports" },
       { icon: BarChart3, label: "Custom Reports", path: "/custom-reports" },
       { icon: TrendingUp, label: "Analytics Dashboard", path: "/analytics" },

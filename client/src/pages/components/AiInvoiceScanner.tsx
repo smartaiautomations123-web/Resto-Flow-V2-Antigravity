@@ -65,7 +65,7 @@ export function AiInvoiceScanner({ onSuccess, suppliers, ingredients }: AiInvoic
 
             // Try to auto-match ingredients based on description
             const initialMap: Record<number, string> = {};
-            result.items.forEach((item, idx) => {
+            result.items.forEach((item: any, idx: number) => {
                 const match = ingredients.find(ing =>
                     item.description.toLowerCase().includes(ing.name.toLowerCase()) ||
                     ing.name.toLowerCase().includes(item.description.toLowerCase())

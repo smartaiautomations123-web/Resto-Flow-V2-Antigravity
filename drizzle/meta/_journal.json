@@ -36,6 +36,13 @@
       "when": 1771555760852,
       "tag": "0004_free_kid_colt",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1772535021439,
+      "tag": "0005_productive_spirit",
+      "breakpoints": true
     }
   ]
 }

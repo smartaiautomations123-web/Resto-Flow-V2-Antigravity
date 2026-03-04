@@ -36,7 +36,8 @@ import {
   deliverySettings, receiptSettings, securitySettings, apiKeys,
   auditLogSettings, backupSettings, localizationSettings, currencySettings,
   integrations, integrationLogs, customReports, reportExports,
-  analyticsDashboard, kpiMetrics, forecastingData, dataImportJobs
+  analyticsDashboard, kpiMetrics, forecastingData, dataImportJobs,
+  weatherData, localEvents, ingredientForecasts, stockPerformanceAlerts
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -4434,6 +4435,21 @@ export async function recordForecastingData(date: string, dayOfWeek: string, for
   });
 }
 
+export async function createForecastingData(data: typeof forecastingData.$inferInsert) {
+  const db = await getDb();
+  return await db.insert(forecastingData).values(data);
+}
+
+export async function getForecastingDataByDate(date: string) {
+  const db = await getDb();
+  return await db.select().from(forecastingData).where(eq(forecastingData.date, date));
+}
+
+export async function updateForecastingData(id: number, data: Partial<typeof forecastingData.$inferInsert>) {
+  const db = await getDb();
+  return await db.update(forecastingData).set(data).where(eq(forecastingData.id, id));
+}
+
 export async function updateForecastingActuals(date: string, actualRevenue: number, actualOrders: number) {
   const db = await getDb();
   const existing = await db.select().from(forecastingData).where(eq(forecastingData.date, date)).limit(1);
@@ -4477,7 +4493,41 @@ export async function getForecastAccuracy(days = 30) {
   return totalAccuracy / data.length;
 }
 
+// ─── STOCK PERFORMANCE ALERTS ─────────────────────────────────────────
+
+export async function createStockPerformanceAlert(data: typeof stockPerformanceAlerts.$inferInsert) {
+  const db = await getDb();
+  return await db.insert(stockPerformanceAlerts).values(data);
+}
+
+export async function getUnresolvedStockAlerts() {
+  const db = await getDb();
+  return await db.select().from(stockPerformanceAlerts)
+    .where(eq(stockPerformanceAlerts.isResolved, false))
+    .orderBy(desc(stockPerformanceAlerts.dateGenerated));
+}
+
 // ─── ADVANCED ANALYTICS ─────────────────────────────────────────────
+
+export async function getHistoricalSeasonality() {
+  const db = await getDb();
+  // Group by month (1-12) and category to find long-term seasonal trends
+  // This massively compresses years of data into a small matrix for the AI
+  return await db.select({
+    month: sql<number>`MONTH(${orders.createdAt})`,
+    categoryName: menuCategories.name,
+    avgQuantityPerMonth: sql<number>`AVG(${orderItems.quantity})`,
+    totalRevenueInMonth: sql<number>`SUM(${orderItems.quantity} * ${orderItems.unitPrice})`
+  })
+    .from(orderItems)
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .innerJoin(menuItems, eq(menuItems.id, orderItems.menuItemId))
+    .innerJoin(menuCategories, eq(menuCategories.id, menuItems.categoryId))
+    .where(isNotNull(orders.createdAt)) // Ensure we have a date
+    .groupBy(sql`MONTH(${orders.createdAt})`, menuCategories.name)
+    .orderBy(sql`MONTH(${orders.createdAt})`, menuCategories.name);
+}
+
 export async function getRevenueByCategory(startDate: string, endDate: string) {
   const db = await getDb();
   return await db.select({

@@ -55,7 +55,7 @@ export function AiMenuImporter({ onSuccess, categories }: AiMenuImporterProps) {
 
             // Auto-map existing categories if names match
             const initialMap: Record<string, number> = {};
-            result.categories.forEach(aiCat => {
+            result.categories.forEach((aiCat: any) => {
                 const existing = categories.find(c => c.name.toLowerCase() === aiCat.name.toLowerCase());
                 if (existing) {
                     initialMap[aiCat.name] = existing.id;

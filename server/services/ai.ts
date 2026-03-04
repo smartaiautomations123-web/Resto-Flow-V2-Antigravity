@@ -194,3 +194,115 @@ export async function generateComboSuggestions(contextDataStr: string, currentIt
         throw new Error("Failed to generate combo suggestions");
     }
 }
+
+// -----------------------------------------------------------------------------
+// Advanced Forecasting Engine
+// -----------------------------------------------------------------------------
+
+export const aiForecastSchema = z.object({
+    forecasts: z.array(z.object({
+        date: z.string().describe("The forecast date, YYYY-MM-DD"),
+        forecastedRevenue: z.number().describe("Predicted revenue for the day"),
+        forecastedOrders: z.number().describe("Predicted number of orders"),
+        projectedLabourHours: z.number().describe("Recommended labour hours"),
+        projectedLabourCost: z.number().describe("Estimated labour cost based on hours * avg rate"),
+        weatherImpactScore: z.number().describe("Percentage impact (e.g. -15 for heavy rain, 0 for clear)"),
+        eventImpactScore: z.number().describe("Percentage impact (e.g. 20 for local sports event)"),
+        confidence: z.number().describe("Confidence score (0-100) based on historical data availability"),
+        ingredientsToPrep: z.array(z.object({
+            ingredientId: z.number(),
+            ingredientName: z.string(),
+            projectedUsage: z.number(),
+            unit: z.string()
+        })).optional()
+    }))
+});
+
+export type AiForecastResult = z.infer<typeof aiForecastSchema>;
+
+export async function generateAdvancedForecast(contextDataStr: string): Promise<AiForecastResult> {
+    if (!ENV.openaiApiKey) {
+        throw new Error("OpenAI API Key is not configured.");
+    }
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are an advanced AI Sales & Labour Forecasting engine for a restaurant. 
+Your goal is to accurately predict revenue, required labour hours, and ingredient prep quantities based on the provided JSON context data.
+The context will include recent 14-day historical sales, upcoming weather/events, AND a 'multiYearSeasonalityTrends' matrix.
+The 'multiYearSeasonalityTrends' matrix compresses years of historical data into average sales volume per category per month (1=Jan, 12=Dec). Use this matrix to strongly weight your predictions based on long-term seasonal patterns (e.g. if the matrix shows ice cream jumps 400% in August natively across all years, increase the August forecast for cold desserts accordingly, regardless of the recent 14-day baseline).
+Use weather (rain reduces footfall, sun increases it) and events (concerts increase orders) to adjust your baseline predictions further.
+Return your predictions strictly in the requested JSON schema.`
+                },
+                {
+                    role: "user",
+                    content: `Here is the current operational data context for the next 7 days:\n\n${contextDataStr}`
+                },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.2, // Keep predictions stable
+        });
+
+        const content = response.choices[0]?.message?.content || "{}";
+        const validatedData = aiForecastSchema.parse(JSON.parse(content));
+        return validatedData;
+    } catch (error) {
+        console.error("Error generating advanced forecast with AI:", error);
+        throw new Error("Failed to generate sales forecast");
+    }
+}
+
+// -----------------------------------------------------------------------------
+// AI Stock Performance & Seasonality Detector
+// -----------------------------------------------------------------------------
+
+export const aiStockAlertsSchema = z.object({
+    alerts: z.array(z.object({
+        ingredientId: z.number(),
+        ingredientName: z.string(),
+        alertType: z.enum(["slow_moving", "high_waste_risk", "seasonal_upward", "seasonal_downward"]),
+        recommendation: z.string().describe("Actionable advice, e.g., 'Run a 20% off special on X to clear Y'"),
+        seasonalityScore: z.number().describe("Current demand velocity vs historical average (e.g., 1.5 for 50% higher demand)")
+    }))
+});
+
+export type AiStockAlertsResult = z.infer<typeof aiStockAlertsSchema>;
+
+export async function analyzeStockPerformance(inventoryDataStr: string): Promise<AiStockAlertsResult> {
+    if (!ENV.openaiApiKey) {
+        throw new Error("OpenAI API Key is not configured.");
+    }
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are an AI Inventory & Wastage Reduction expert for a restaurant. 
+Your goal is to identify slow-moving stock that is at risk of expiration, and detect seasonal trends (e.g. ice cream sales rising in summer).
+You will be provided with current inventory levels, historical order velocity, and recent waste logs.
+Generate actionable alerts specifically targeting items that need immediate attention to prevent food waste, and return strictly in the requested JSON schema.`
+                },
+                {
+                    role: "user",
+                    content: `Here is the current inventory and historical velocity data:\n\n${inventoryDataStr}`
+                },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.3,
+        });
+
+        const content = response.choices[0]?.message?.content || "{}";
+        const validatedData = aiStockAlertsSchema.parse(JSON.parse(content));
+        return validatedData;
+    } catch (error) {
+        console.error("Error analyzing stock performance with AI:", error);
+        throw new Error("Failed to analyze stock performance");
+    }
+}
+

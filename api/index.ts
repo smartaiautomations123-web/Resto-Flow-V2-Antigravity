@@ -13,6 +13,10 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // OAuth Integrations Routes
 app.use("/api/auth", integrationsAuthRouter);
 
+// DB Seeding Routes
+import { seedMultiYearRouter } from "./seed-multi-year";
+app.use("/api", seedMultiYearRouter);
+
 // tRPC API
 app.use(
     "/api/trpc",

@@ -1233,6 +1233,61 @@ export const kpiMetrics = mysqlTable("kpi_metrics", {
 export type KPIMetric = typeof kpiMetrics.$inferSelect;
 export type InsertKPIMetric = typeof kpiMetrics.$inferInsert;
 
+// ─── Weather Data ───────────────────────────────────────────────────
+export const weatherData = mysqlTable("weather_data", {
+  id: int("id").autoincrement().primaryKey(),
+  date: varchar("date", { length: 10 }).notNull().unique(), // YYYY-MM-DD
+  tempMax: decimal("tempMax", { precision: 5, scale: 2 }),
+  tempMin: decimal("tempMin", { precision: 5, scale: 2 }),
+  condition: varchar("condition", { length: 50 }), // e.g., "sunny", "rain", "snow"
+  precipitationProbability: decimal("precipitationProbability", { precision: 5, scale: 2 }).default("0"),
+  isSimulated: boolean("isSimulated").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type WeatherData = typeof weatherData.$inferSelect;
+export type InsertWeatherData = typeof weatherData.$inferInsert;
+
+// ─── Local Events ───────────────────────────────────────────────────
+export const localEvents = mysqlTable("local_events", {
+  id: int("id").autoincrement().primaryKey(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  eventName: varchar("eventName", { length: 255 }).notNull(),
+  eventType: varchar("eventType", { length: 50 }), // e.g., "sports", "concert", "holiday"
+  estimatedAttendance: int("estimatedAttendance"),
+  impactMultiplier: decimal("impactMultiplier", { precision: 5, scale: 2 }).default("1.0"), // Baseline 1.0
+  isSimulated: boolean("isSimulated").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type LocalEvent = typeof localEvents.$inferSelect;
+export type InsertLocalEvent = typeof localEvents.$inferInsert;
+
+// ─── Ingredient Forecasts ───────────────────────────────────────────
+export const ingredientForecasts = mysqlTable("ingredient_forecasts", {
+  id: int("id").autoincrement().primaryKey(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  ingredientId: int("ingredientId").notNull().references(() => ingredients.id),
+  projectedUsage: decimal("projectedUsage", { precision: 10, scale: 3 }).default("0"),
+  unit: varchar("unit", { length: 32 }),
+  confidenceScore: decimal("confidenceScore", { precision: 5, scale: 2 }).default("0"), // 0-100
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type IngredientForecast = typeof ingredientForecasts.$inferSelect;
+export type InsertIngredientForecast = typeof ingredientForecasts.$inferInsert;
+
+// ─── Stock Performance Alerts ───────────────────────────────────────
+export const stockPerformanceAlerts = mysqlTable("stock_performance_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  ingredientId: int("ingredientId").notNull().references(() => ingredients.id),
+  dateGenerated: varchar("dateGenerated", { length: 10 }).notNull(),
+  alertType: mysqlEnum("alertType", ["slow_moving", "high_waste_risk", "seasonal_upward", "seasonal_downward"]).notNull(),
+  recommendation: text("recommendation").notNull(), // Actionable advice
+  seasonalityScore: decimal("seasonalityScore", { precision: 5, scale: 2 }).default("1.0"), // Multiplier for current season vs average
+  isResolved: boolean("isResolved").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type StockPerformanceAlert = typeof stockPerformanceAlerts.$inferSelect;
+export type InsertStockPerformanceAlert = typeof stockPerformanceAlerts.$inferInsert;
+
 // ─── Forecasting Data ───────────────────────────────────────────────
 export const forecastingData = mysqlTable("forecasting_data", {
   id: int("id").autoincrement().primaryKey(),
@@ -1242,6 +1297,10 @@ export const forecastingData = mysqlTable("forecasting_data", {
   actualRevenue: decimal("actualRevenue", { precision: 12, scale: 2 }),
   forecastedOrders: int("forecastedOrders").default(0),
   actualOrders: int("actualOrders"),
+  projectedLabourHours: decimal("projectedLabourHours", { precision: 7, scale: 2 }).default("0"),
+  projectedLabourCost: decimal("projectedLabourCost", { precision: 12, scale: 2 }).default("0"),
+  weatherImpactScore: decimal("weatherImpactScore", { precision: 5, scale: 2 }).default("0"), // e.g. -15% if heavy rain
+  eventImpactScore: decimal("eventImpactScore", { precision: 5, scale: 2 }).default("0"),    // e.g. +20% if big game
   confidence: decimal("confidence", { precision: 5, scale: 2 }).default("0"), // 0-100
   accuracy: decimal("accuracy", { precision: 5, scale: 2 }), // after actual is known
   createdAt: timestamp("createdAt").defaultNow().notNull(),

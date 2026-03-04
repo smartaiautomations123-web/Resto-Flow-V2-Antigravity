@@ -51,6 +51,7 @@ import Integrations from "./pages/Integrations";
 import DataImports from "./pages/DataImports";
 import CustomReportBuilder from "./pages/CustomReportBuilder";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
+import SalesForecasting from "./pages/SalesForecasting";
 import AuthPage from "./pages/Auth";
 
 function Router() {
@@ -112,6 +113,7 @@ function Router() {
       <Route path="/z-reports" component={() => <DashboardLayout><ZReports /></DashboardLayout>} />
       <Route path="/custom-reports" component={() => <DashboardLayout><CustomReportBuilder /></DashboardLayout>} />
       <Route path="/analytics" component={() => <DashboardLayout><AnalyticsDashboard /></DashboardLayout>} />
+      <Route path="/sales-forecasting" component={() => <DashboardLayout><SalesForecasting /></DashboardLayout>} />
 
       {/* ─── Settings & Admin ─────────────────────── */}
       <Route path="/settings" component={() => <DashboardLayout><Settings /></DashboardLayout>} />
