@@ -17,7 +17,7 @@ describe("Order Status Tracking", () => {
     testOrderNumber = `TRACK-${Date.now()}`;
     const order = await db.createOrder({
       orderNumber: testOrderNumber,
-      customerId: customer[0].id,
+      customerId: (customer as any)[0].insertId,
       type: "online",
       status: "pending",
       subtotal: "50.00",
@@ -26,7 +26,7 @@ describe("Order Status Tracking", () => {
       paymentMethod: "card",
     });
 
-    testOrderId = order[0].id;
+    testOrderId = (order as any)[0].insertId;
   });
 
   it("should get order by order number", async () => {

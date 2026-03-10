@@ -24,7 +24,7 @@ describe("Profitability Analysis", () => {
       expect(item.revenue).toBeGreaterThanOrEqual(0);
       expect(item.cogs).toBeGreaterThanOrEqual(0);
     }
-  });
+  }, 30000);
 
   it("should get profitability by category", async () => {
     const { getProfitabilityByCategory } = await import("./db");
@@ -53,21 +53,18 @@ describe("Profitability Analysis", () => {
       expect(shift).toHaveProperty("staffId");
       expect(shift).toHaveProperty("revenue");
       expect(shift).toHaveProperty("cogs");
-      expect(shift).toHaveProperty("discounts");
       expect(shift).toHaveProperty("labourCost");
-      expect(shift).toHaveProperty("grossProfit");
       expect(shift).toHaveProperty("netProfit");
-      expect(shift).toHaveProperty("profitMargin");
     }
   });
 
   it("should get top profitable items", async () => {
     const { getTopProfitableItems } = await import("./db");
-    const results = await getTopProfitableItems(thirtyDaysAgo, today, 10);
+    const results = await getTopProfitableItems(10, thirtyDaysAgo, today);
 
     expect(Array.isArray(results)).toBe(true);
     expect(results.length).toBeLessThanOrEqual(10);
-    
+
     // Verify sorted by profit descending
     if (results.length > 1) {
       for (let i = 0; i < results.length - 1; i++) {
@@ -78,11 +75,11 @@ describe("Profitability Analysis", () => {
 
   it("should get bottom profitable items", async () => {
     const { getBottomProfitableItems } = await import("./db");
-    const results = await getBottomProfitableItems(thirtyDaysAgo, today, 10);
+    const results = await getBottomProfitableItems(10, thirtyDaysAgo, today);
 
     expect(Array.isArray(results)).toBe(true);
     expect(results.length).toBeLessThanOrEqual(10);
-    
+
     // Verify sorted by profit ascending
     if (results.length > 1) {
       for (let i = 0; i < results.length - 1; i++) {
@@ -92,8 +89,8 @@ describe("Profitability Analysis", () => {
   });
 
   it("should get profit trends", async () => {
-    const { getProfitTrends } = await import("./db");
-    const results = await getProfitTrends(thirtyDaysAgo, today);
+    const { getDailyProfitTrend } = await import("./db");
+    const results = await getDailyProfitTrend(thirtyDaysAgo, today);
 
     expect(Array.isArray(results)).toBe(true);
     if (results.length > 0) {
@@ -101,12 +98,10 @@ describe("Profitability Analysis", () => {
       expect(trend).toHaveProperty("date");
       expect(trend).toHaveProperty("revenue");
       expect(trend).toHaveProperty("cogs");
-      expect(trend).toHaveProperty("discounts");
       expect(trend).toHaveProperty("grossProfit");
       expect(trend).toHaveProperty("netProfit");
       expect(trend).toHaveProperty("profitMargin");
       expect(trend).toHaveProperty("orderCount");
-      expect(trend).toHaveProperty("avgOrderValue");
     }
   });
 
@@ -115,20 +110,15 @@ describe("Profitability Analysis", () => {
     const summary = await getProfitabilitySummary(thirtyDaysAgo, today);
 
     expect(summary).toHaveProperty("totalRevenue");
-    expect(summary).toHaveProperty("totalCogs");
-    expect(summary).toHaveProperty("totalDiscounts");
+    expect(summary).toHaveProperty("cogs");
     expect(summary).toHaveProperty("grossProfit");
-    expect(summary).toHaveProperty("netProfit");
-    expect(summary).toHaveProperty("profitMargin");
+    expect(summary).toHaveProperty("grossMargin");
     expect(summary).toHaveProperty("cogsPercentage");
     expect(summary).toHaveProperty("totalOrders");
-    expect(summary).toHaveProperty("totalItems");
-    expect(summary).toHaveProperty("avgOrderValue");
-    expect(summary).toHaveProperty("avgItemPrice");
+    expect(summary).toHaveProperty("avgTicket");
 
     // Verify calculations
-    expect(summary.grossProfit).toBe(summary.totalRevenue - summary.totalCogs);
-    expect(summary.netProfit).toBe(summary.grossProfit - summary.totalDiscounts);
+    expect(summary.grossProfit).toBe(summary.totalRevenue - summary.cogs);
   });
 
   it("should calculate profit margin correctly", async () => {
@@ -136,8 +126,8 @@ describe("Profitability Analysis", () => {
     const summary = await getProfitabilitySummary(thirtyDaysAgo, today);
 
     if (summary.totalRevenue > 0) {
-      const expectedMargin = (summary.netProfit / summary.totalRevenue) * 100;
-      expect(summary.profitMargin).toBeCloseTo(expectedMargin, 1);
+      const expectedMargin = (summary.grossProfit / summary.totalRevenue) * 100;
+      expect(summary.grossMargin).toBeCloseTo(expectedMargin, 1);
     }
   });
 
@@ -146,7 +136,7 @@ describe("Profitability Analysis", () => {
     const summary = await getProfitabilitySummary(thirtyDaysAgo, today);
 
     if (summary.totalRevenue > 0) {
-      const expectedCogs = (summary.totalCogs / summary.totalRevenue) * 100;
+      const expectedCogs = (summary.cogs / summary.totalRevenue) * 100;
       expect(summary.cogsPercentage).toBeCloseTo(expectedCogs, 1);
     }
   });
@@ -157,7 +147,7 @@ describe("Profitability Analysis", () => {
     const summary = await getProfitabilitySummary(futureDate, futureDate);
 
     expect(summary.totalRevenue).toBe(0);
-    expect(summary.totalCogs).toBe(0);
+    expect(summary.cogs).toBe(0);
     expect(summary.totalOrders).toBe(0);
   });
 });

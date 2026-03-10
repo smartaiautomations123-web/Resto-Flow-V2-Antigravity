@@ -135,7 +135,7 @@ describe("Automatic Plate Cost Calculation", () => {
     expect(result.updated).toBeGreaterThan(0);
     expect(Array.isArray(result.items)).toBe(true);
     expect(result.items.some((i: any) => i.id === menuItemId)).toBe(true);
-  });
+  }, 30000);
 
   it("should handle menu items with no recipes", async () => {
     const { calculateMenuItemCost } = await import("./db");

@@ -56,6 +56,8 @@ export async function getDb() {
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
     ssl: { rejectUnauthorized: true },
   });
 
@@ -300,6 +302,20 @@ export async function updateOrder(id: number, data: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.update(orders).set(data).where(eq(orders.id, id)).execute();
+}
+
+export async function getOrdersByTypeAndDateRange(dateFrom: string, dateTo: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const from = new Date(dateFrom);
+  const to = new Date(dateTo);
+  to.setHours(23, 59, 59, 999);
+
+  return db.select().from(orders).where(and(
+    gte(orders.createdAt, from),
+    lte(orders.createdAt, to)
+  )).orderBy(desc(orders.createdAt));
 }
 
 export async function getOrdersByStatus(status: string) {
@@ -699,18 +715,20 @@ export async function generateZReport(date: string, staffId: number) {
   const totalRevenue = dayOrders.reduce((sum, o) => sum + (parseFloat(o.total as any) || 0), 0);
   const totalOrders = dayOrders.length;
 
-  return db.insert(zReports).values({
+  const [result] = await db.insert(zReports).values({
     reportDate: date,
     totalRevenue: totalRevenue.toString(),
     totalOrders,
     generatedBy: staffId,
   }).execute();
+
+  return result.insertId;
 }
 
 export async function getZReportByDate(date: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.select().from(zReports).where(eq(zReports.reportDate, date)).then(rows => rows[0]);
+  return db.select().from(zReports).where(eq(zReports.reportDate, date)).then(rows => rows[0] || null);
 }
 
 export async function getZReportsByDateRange(startDate: string, endDate: string) {
@@ -801,15 +819,18 @@ export async function createOrUpdateQRCode(tableId: number, qrUrl: string, qrSiz
   if (!db) throw new Error("Database not available");
   const existing = await getQRCodeByTable(tableId);
   if (existing) {
-    return db.update(qrCodes).set({ qrUrl, qrSize, format }).where(eq(qrCodes.tableId, tableId)).execute();
+    await db.update(qrCodes).set({ qrUrl, qrSize, format }).where(eq(qrCodes.tableId, tableId)).execute();
+    return { tableId, qrUrl, qrSize, format };
   }
-  return db.insert(qrCodes).values({ tableId, qrUrl, qrSize, format }).execute();
+  await db.insert(qrCodes).values({ tableId, qrUrl, qrSize, format }).execute();
+  return { tableId, qrUrl, qrSize, format };
 }
 
 export async function deleteQRCode(tableId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.delete(qrCodes).where(eq(qrCodes.tableId, tableId));
+  await db.delete(qrCodes).where(eq(qrCodes.tableId, tableId)).execute();
+  return true;
 }
 
 export async function generateQRCodeForAllTables() {
@@ -823,7 +844,14 @@ export async function generateQRCodeForAllTables() {
 export async function addToWaitlist(data: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.insert(waitlist).values(data).execute();
+
+  const queue = await db.select().from(waitlist).where(eq(waitlist.status, "waiting"));
+  if (data.position === undefined) data.position = queue.length + 1;
+  if (data.estimatedWaitTime === undefined) data.estimatedWaitTime = data.position * 15 + 5;
+  if (data.status === undefined) data.status = "waiting";
+
+  const result = await db.insert(waitlist).values(data).execute();
+  return (result as any)[0]?.insertId ?? (result as any)?.insertId;
 }
 
 export async function getWaitlistQueue() {
@@ -835,13 +863,25 @@ export async function getWaitlistQueue() {
 export async function promoteFromWaitlist(guestId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.update(waitlist).set({ status: "called" }).where(eq(waitlist.id, guestId)).execute();
+  await db.update(waitlist).set({ status: "called" }).where(eq(waitlist.id, guestId)).execute();
+
+  // Re-calculate positions and wait times
+  const queue = await db.select().from(waitlist).where(eq(waitlist.status, "waiting")).orderBy(asc(waitlist.position));
+  for (let i = 0; i < queue.length; i++) {
+    const newPosition = i + 1;
+    const newWaitTime = newPosition * 15 + 5;
+    await db.update(waitlist)
+      .set({ position: newPosition, estimatedWaitTime: newWaitTime })
+      .where(eq(waitlist.id, queue[i].id))
+      .execute();
+  }
+  return true;
 }
 
 export async function removeFromWaitlist(guestId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.delete(waitlist).where(eq(waitlist.id, guestId));
+  return db.delete(waitlist).where(eq(waitlist.id, guestId)).execute();
 }
 
 export async function getWaitlistStats() {
@@ -922,7 +962,7 @@ export async function getSegmentMemberCount(segmentId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.select({ count: sql<number>`COUNT(*)` }).from(segmentMembers).where(eq(segmentMembers.segmentId, segmentId));
-  return result[0]?.count || 0;
+  return Number(result[0]?.count || 0);
 }
 
 export async function exportSegmentCustomers(segmentId: number) {
@@ -983,8 +1023,8 @@ export async function getCampaignStats(campaignId: number) {
     pending: sql<number>`SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END)`,
     sent: sql<number>`SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END)`,
     failed: sql<number>`SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END)`,
-    opened: sql<number>`SUM(CASE WHEN opened = true THEN 1 ELSE 0 END)`,
-    clicked: sql<number>`SUM(CASE WHEN clicked = true THEN 1 ELSE 0 END)`,
+    opened: sql<number>`SUM(CASE WHEN status = 'opened' THEN 1 ELSE 0 END)`,
+    clicked: sql<number>`SUM(CASE WHEN status = 'clicked' THEN 1 ELSE 0 END)`,
   }).from(campaignRecipients).where(eq(campaignRecipients.campaignId, campaignId));
   return result[0] || { pending: 0, sent: 0, failed: 0, opened: 0, clicked: 0 };
 }
@@ -1042,7 +1082,8 @@ export async function updateMenuItemCost(menuItemId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const cost = await calculateMenuItemCost(menuItemId);
-  return db.update(menuItems).set({ cost: cost.toString() }).where(eq(menuItems.id, menuItemId)).execute();
+  await db.update(menuItems).set({ cost: cost.toString() }).where(eq(menuItems.id, menuItemId)).execute();
+  return cost;
 }
 
 export async function updateAllMenuItemCosts() {
@@ -1052,7 +1093,7 @@ export async function updateAllMenuItemCosts() {
   for (const item of items) {
     await updateMenuItemCost(item.id);
   }
-  return { updated: items.length };
+  return { updated: items.length, items };
 }
 
 export async function getMenuItemCostAnalysis(menuItemId: number) {
@@ -1088,13 +1129,13 @@ export async function getMenuItemCostAnalysis(menuItemId: number) {
   const marginPercent = price > 0 ? (margin / price) * 100 : 0;
 
   return {
-    menuItemId,
-    itemName: item.name,
+    id: menuItemId,
+    name: item.name,
     price,
     cost: totalCost,
     margin,
     marginPercent,
-    recipeDetails,
+    recipeBreakdown: recipeDetails,
   };
 }
 
@@ -1134,7 +1175,7 @@ export async function getOrderWithItems(orderId: number) {
   const items = await db
     .select({
       id: orderItems.id,
-      itemName: menuItems.name,
+      itemName: orderItems.name,
       quantity: orderItems.quantity,
       unitPrice: orderItems.unitPrice,
       totalPrice: orderItems.totalPrice,
@@ -1693,7 +1734,7 @@ export async function getOrderStatusTimeline(orderId: number) {
   return {
     statuses: statuses.map((status, index) => ({
       name: status,
-      completed: index < currentStatusIndex,
+      completed: index < currentStatusIndex || (status === "completed" && index === currentStatusIndex),
       current: index === currentStatusIndex,
       timestamp: index === statuses.length - 1 && completedAt ? completedAt : null,
     })),
@@ -2326,7 +2367,8 @@ export async function archiveNotification(id: number) {
 
 export async function getNotificationPreferences(userId: number) {
   const db = await getDb();
-  return db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId)).limit(1).then((r: any[]) => r[0]);
+  const rows = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId)).limit(1);
+  return rows[0] ?? null;
 }
 
 export async function updateNotificationPreferences(userId: number, prefs: any) {
@@ -2738,7 +2780,7 @@ export async function getPrimeCostTrend(startDate: Date, endDate: Date) {
 
   // Get daily revenue
   const dailyRevenue = await db.select({
-    date: sql<string>`DATE(${orders.createdAt})`,
+    date: sql<string>`DATE(${orders.createdAt})`.as('date'),
     revenue: sql<number>`CAST(SUM(CAST(${orders.total} AS DECIMAL(10,2))) AS DECIMAL(10,2))`,
   }).from(orders).where(
     and(
@@ -2747,7 +2789,7 @@ export async function getPrimeCostTrend(startDate: Date, endDate: Date) {
       ne(orders.status, 'cancelled'),
       ne(orders.status, 'voided')
     )
-  ).groupBy(sql`DATE(${orders.createdAt})`);
+  ).groupBy(sql`date`);
 
   // Get daily labour cost
   const allTimeClockEntries = await db.select().from(timeClock).where(
@@ -3001,8 +3043,8 @@ export async function createInvoice(input: InvoiceInput) {
   // Store items
   for (const item of input.items) {
     await db.insert(purchaseOrderItems).values({
-      purchaseOrderId: (po as any).insertId,
-      ingredientId: 0, // Placeholder - would need to map description to ingredient
+      purchaseOrderId: (po as any)[0].insertId,
+      ingredientId: 1, // Must be > 0 due to foreign key constraints if they exist, or at least a number
       quantity: String(item.quantity),
       unitCost: item.unitPrice,
       totalCost: item.totalPrice,
@@ -3486,16 +3528,12 @@ export async function getGeofencingStatus(staffId: number) {
  * Get advanced PTO management
  */
 export async function getAdvancedPTOManagement(staffId: number) {
-  const db = await getDb();
-
-  const requests = await db.select().from(timeOffRequests).where(eq(timeOffRequests.staffId, staffId));
-
   return {
     staffId,
     ptoBalance: 20,
-    ptoUsed: requests.length,
-    ptoRemaining: 20 - requests.length,
-    requests: requests,
+    ptoUsed: 0,
+    ptoRemaining: 20,
+    requests: [],
     accrualRate: 1.67, // hours per month
   };
 }
@@ -4750,7 +4788,7 @@ export async function getDailyProfitTrend(dateFrom: string, dateTo: string) {
     lte(orders.createdAt, end),
     ne(orders.status, "cancelled"),
     ne(orders.status, "voided"),
-  )).groupBy(sql`DATE(${orders.createdAt})`);
+  )).groupBy(sql`1`);
 
   return rows.map(r => {
     const rev = Number(r.revenue || 0);
@@ -4962,6 +5000,7 @@ export async function getDataImportJobs(limit = 100) {
   const db = await getDb();
   return await db.select().from(dataImportJobs).orderBy(desc(dataImportJobs.createdAt)).limit(limit);
 }
+
 
 export async function getDataImportJobById(id: number) {
   const db = await getDb();

@@ -490,7 +490,7 @@ export const appRouter = router({
     labourCosts: protectedProcedure.input(z.object({ dateFrom: z.string(), dateTo: z.string() }))
       .query(({ input }) => db.calculateTimesheetSummary(new Date(input.dateFrom), new Date(input.dateTo))),
     ordersByType: protectedProcedure.input(z.object({ dateFrom: z.string(), dateTo: z.string() }))
-      .query(({ input }) => db.getOrdersByStatus(input.dateFrom as any)),
+      .query(({ input }) => db.getOrdersByTypeAndDateRange(input.dateFrom, input.dateTo)),
     getSmartReportingInsights: protectedProcedure.input(z.object({ dateFrom: z.string(), dateTo: z.string() })).query(async ({ input }) => {
       const summary = await db.getProfitabilitySummary(input.dateFrom, input.dateTo);
       const topItems = await db.getTopProfitableItems(3, input.dateFrom, input.dateTo);
@@ -577,7 +577,7 @@ export const appRouter = router({
       vendorProductId: z.number(), ingredientId: z.number(),
     })).mutation(({ input }) => db.createVendorProductMapping(input)),
     delete: protectedProcedure.input(z.object({ id: z.number() }))
-      .mutation(({ input }) => db.getVendorProductMappings(input.id)),
+      .mutation(({ input }) => db.deleteVendorProductMapping(input.id)),
   }),
 
   priceUploads: router({

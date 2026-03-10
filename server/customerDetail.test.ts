@@ -64,8 +64,8 @@ describe("Customer Detail View", () => {
     const result = await getCustomerWithOrderHistory(customerId);
 
     expect(result).toBeDefined();
-    expect(result?.customer.name).toBe("Test Customer");
-    expect(result?.customer.email).toBe("test@example.com");
+    expect(result?.name).toBe("Test Customer");
+    expect(result?.email).toBe("test@example.com");
     expect(result?.orderHistory).toHaveLength(1);
     expect(result?.orderHistory[0].orderNumber).toBe("TEST-001");
   });
@@ -75,7 +75,7 @@ describe("Customer Detail View", () => {
     const result = await getOrderWithItems(orderId);
 
     expect(result).toBeDefined();
-    expect(result?.order.orderNumber).toBe("TEST-001");
+    expect(result?.orderNumber).toBe("TEST-001");
     expect(result?.items).toHaveLength(1);
     expect(result?.items[0].itemName).toBe("Test Item");
     expect(result?.items[0].quantity).toBe(2);
@@ -86,9 +86,9 @@ describe("Customer Detail View", () => {
     const result = await getLoyaltyPointsHistory(customerId);
 
     expect(result).toBeDefined();
-    expect(Array.isArray(result)).toBe(true);
-    expect(result).toHaveLength(1);
-    expect(parseFloat(result[0].total as any)).toBe(100);
+    expect(Array.isArray(result?.orderHistory)).toBe(true);
+    expect(result?.orderHistory).toHaveLength(1);
+    expect(parseFloat(result?.orderHistory[0].total as any)).toBe(100);
   });
 
   it("should create order from customer order", async () => {
@@ -99,13 +99,13 @@ describe("Customer Detail View", () => {
     const newOrderId = await createOrderFromCustomerOrder(customerId, orderId);
 
     expect(newOrderId).toBeDefined();
-    expect(typeof newOrderId).toBe("number");
+    expect(typeof newOrderId.id).toBe("number");
 
     // Verify new order was created
     const newOrder = await db
       .select()
       .from(orders)
-      .where(eq(orders.id, newOrderId))
+      .where(eq(orders.id, newOrderId.id))
       .limit(1);
 
     expect(newOrder).toHaveLength(1);
@@ -116,7 +116,7 @@ describe("Customer Detail View", () => {
     const newItems = await db
       .select()
       .from(orderItems)
-      .where(eq(orderItems.orderId, newOrderId));
+      .where(eq(orderItems.orderId, newOrderId.id));
 
     expect(newItems).toHaveLength(1);
     expect(newItems[0].name).toBe("Test Item");
@@ -155,7 +155,7 @@ describe("Customer Detail View", () => {
     const result = await getLoyaltyPointsHistory(newCustomerId);
 
     expect(result).toBeDefined();
-    expect(Array.isArray(result)).toBe(true);
-    expect(result).toHaveLength(0);
+    expect(Array.isArray(result?.orderHistory)).toBe(true);
+    expect(result?.orderHistory).toHaveLength(0);
   });
 });

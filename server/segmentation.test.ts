@@ -16,7 +16,7 @@ describe("Customer Segmentation", () => {
   it("should get segment by id", async () => {
     const { createSegment, getSegmentById } = await import("./db");
     const created = await createSegment("Test Segment", "Test description", "#0000ff");
-    const segmentId = (created as any).insertId;
+    const segmentId = (created as any)[0].insertId;
     const segment = await getSegmentById(segmentId);
     expect(segment).toBeDefined();
   });
@@ -24,7 +24,7 @@ describe("Customer Segmentation", () => {
   it("should update segment", async () => {
     const { createSegment, updateSegment } = await import("./db");
     const created = await createSegment("Original Name", "Original description", "#00ff00");
-    const segmentId = (created as any).insertId;
+    const segmentId = (created as any)[0].insertId;
     const result = await updateSegment(segmentId, "Updated Name", "Updated description", "#ffff00");
     expect(result).toBeDefined();
   });
@@ -32,7 +32,7 @@ describe("Customer Segmentation", () => {
   it("should get segment member count", async () => {
     const { createSegment, getSegmentMemberCount } = await import("./db");
     const segment = await createSegment("Count Test", "", "#3b82f6");
-    const segmentId = (segment as any).insertId;
+    const segmentId = (segment as any)[0].insertId;
     const count = await getSegmentMemberCount(segmentId);
     expect(typeof count).toBe("number");
   });
@@ -40,7 +40,7 @@ describe("Customer Segmentation", () => {
   it("should export segment customers", async () => {
     const { createSegment, exportSegmentCustomers } = await import("./db");
     const segment = await createSegment("Export Test", "", "#3b82f6");
-    const segmentId = (segment as any).insertId;
+    const segmentId = (segment as any)[0].insertId;
     const exported = await exportSegmentCustomers(segmentId);
     expect(Array.isArray(exported)).toBe(true);
   });
@@ -60,7 +60,7 @@ describe("Customer Segmentation", () => {
   it("should get campaign stats", async () => {
     const { createCampaign, getCampaignStats } = await import("./db");
     const created = await createCampaign("Stats Test", "email", "Test content");
-    const campaignId = (created as any).insertId;
+    const campaignId = (created as any)[0].insertId;
     const stats = await getCampaignStats(campaignId);
     expect(stats).toHaveProperty("pending");
     expect(stats).toHaveProperty("sent");
@@ -69,7 +69,7 @@ describe("Customer Segmentation", () => {
   it("should get campaign recipients", async () => {
     const { createCampaign, getCampaignRecipients } = await import("./db");
     const created = await createCampaign("Recipients Test", "email", "Test content");
-    const campaignId = (created as any).insertId;
+    const campaignId = (created as any)[0].insertId;
     const recipients = await getCampaignRecipients(campaignId);
     expect(Array.isArray(recipients)).toBe(true);
   });
@@ -77,7 +77,7 @@ describe("Customer Segmentation", () => {
   it("should delete campaign", async () => {
     const { createCampaign, deleteCampaign } = await import("./db");
     const created = await createCampaign("Delete Test", "email", "Test content");
-    const campaignId = (created as any).insertId;
+    const campaignId = (created as any)[0].insertId;
     const result = await deleteCampaign(campaignId);
     expect(result).toBeDefined();
   });

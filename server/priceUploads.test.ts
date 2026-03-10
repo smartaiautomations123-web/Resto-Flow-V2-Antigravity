@@ -11,10 +11,10 @@ vi.mock("./db", () => ({
     { id: 1, supplierId: 1, vendorCode: "12345", description: "SALMON FILLET 4/5#", packSize: "4/5#", packUnit: "lb", packQty: "20", unitPricePer: "lb", currentCasePrice: "89.50", currentUnitPrice: "4.4750", lastUpdated: new Date(), createdAt: new Date(), updatedAt: new Date() },
     { id: 2, supplierId: 1, vendorCode: "67890", description: "SHRIMP 16/20 IQF 5#", packSize: "5#", packUnit: "lb", packQty: "5", unitPricePer: "lb", currentCasePrice: "45.00", currentUnitPrice: "9.0000", lastUpdated: new Date(), createdAt: new Date(), updatedAt: new Date() },
   ]),
-  getVendorProduct: vi.fn().mockResolvedValue(
+  getVendorProductById: vi.fn().mockResolvedValue(
     { id: 1, supplierId: 1, vendorCode: "12345", description: "SALMON FILLET 4/5#", packSize: "4/5#", packUnit: "lb", packQty: "20", unitPricePer: "lb", currentCasePrice: "89.50", currentUnitPrice: "4.4750", lastUpdated: new Date(), createdAt: new Date(), updatedAt: new Date() },
   ),
-  listVendorProductMappings: vi.fn().mockResolvedValue([
+  getVendorProductMappings: vi.fn().mockResolvedValue([
     { id: 1, vendorProductId: 1, ingredientId: 10, createdAt: new Date() },
   ]),
   createVendorProductMapping: vi.fn().mockResolvedValue({ id: 2 }),
@@ -23,10 +23,10 @@ vi.mock("./db", () => ({
   listPriceUploads: vi.fn().mockResolvedValue([
     { id: 1, supplierId: 1, fileName: "order-guide.pdf", fileUrl: "https://example.com/file.pdf", dateRangeStart: "02/03/2025", dateRangeEnd: "02/09/2025", status: "applied", totalItems: 180, newItems: 5, priceChanges: 12, errorMessage: null, createdAt: new Date(), updatedAt: new Date() },
   ]),
-  getPriceUpload: vi.fn().mockResolvedValue(
+  getPriceUploadById: vi.fn().mockResolvedValue(
     { id: 1, supplierId: 1, fileName: "order-guide.pdf", fileUrl: "https://example.com/file.pdf", dateRangeStart: "02/03/2025", dateRangeEnd: "02/09/2025", status: "review", totalItems: 180, newItems: 5, priceChanges: 12, errorMessage: null, createdAt: new Date(), updatedAt: new Date() },
   ),
-  listPriceUploadItems: vi.fn().mockResolvedValue([
+  getPriceUploadItems: vi.fn().mockResolvedValue([
     { id: 1, uploadId: 1, vendorCode: "12345", description: "SALMON FILLET 4/5#", casePrice: "92.00", unitPrice: "4.60", packSize: "4/5#", calculatedUnitPrice: "4.60", previousCasePrice: "89.50", priceChange: "2.50", isNew: false, vendorProductId: 1, createdAt: new Date() },
     { id: 2, uploadId: 1, vendorCode: "99999", description: "NEW PRODUCT TEST", casePrice: "25.00", unitPrice: null, packSize: "1/10#", calculatedUnitPrice: null, previousCasePrice: null, priceChange: null, isNew: true, vendorProductId: null, createdAt: new Date() },
   ]),
