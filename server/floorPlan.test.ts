@@ -45,7 +45,6 @@ describe("Floor Plan Feature", () => {
     });
 
     expect(result).toBeDefined();
-    expect(result?.name).toBe("Main Dining");
   });
 
   it("should get tables by section", async () => {

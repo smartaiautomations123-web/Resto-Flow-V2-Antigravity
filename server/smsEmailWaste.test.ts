@@ -1,7 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import * as db from "./db";
 
 describe("SMS, Email Campaigns, and Waste Tracking", () => {
+  let staffId: number;
+
+  beforeAll(async () => {
+    const s = await db.createStaff({ name: "Test Staff", role: "manager" });
+    staffId = (s as any)[0].insertId;
+  });
   it("should update SMS settings", async () => {
     const result = await db.updateSmsSettings({ isEnabled: true });
     expect(result).toBeDefined();
@@ -33,7 +39,7 @@ describe("SMS, Email Campaigns, and Waste Tracking", () => {
   });
 
   it("should log waste", async () => {
-    const result = await db.logWaste(1, "10", "kg", "spoilage", "50.00", "Test waste", 1);
+    const result = await db.logWaste(1, "10", "kg", "spoilage", "50.00", "Test waste", staffId);
     expect(result).toBeDefined();
   });
 

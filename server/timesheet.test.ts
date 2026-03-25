@@ -10,24 +10,22 @@ describe("Timesheet & Payroll", () => {
   beforeAll(async () => {
     const staff = await db.createStaff({
       name: "Timesheet Test Staff",
-      role: "chef",
+      role: "manager",
       email: "timesheet@example.com",
       phone: "555-0100",
       hourlyRate: "25.00",
     });
-    testStaffId = staff[0].id;
+    testStaffId = staff[0].insertId;
 
     const shift = await db.createShift({
       staffId: testStaffId,
-      date: new Date("2026-01-15"),
-      clockIn: new Date("2026-01-15T09:00:00"),
-      clockOut: new Date("2026-01-15T17:00:00"),
-      hoursWorked: 8,
-      hourlyRate: 25,
-      totalCost: 200,
-      status: "completed",
+      date: "2026-01-15",
+      startTime: "09:00",
+      endTime: "17:00",
+      role: "manager",
+      notes: "completed shift",
     });
-    testShiftId = shift[0].id;
+    testShiftId = shift[0].insertId;
   });
 
   it("should get timesheet data for date range", async () => {
@@ -45,10 +43,10 @@ describe("Timesheet & Payroll", () => {
   });
 
   it("should get timesheet data filtered by role", async () => {
-    const data = await db.getTimesheetData(startDate, endDate, undefined, "chef");
+    const data = await db.getTimesheetData(startDate, endDate, undefined, "manager");
     expect(Array.isArray(data)).toBe(true);
     if (data.length > 0) {
-      expect(data[0].staffRole).toBe("chef");
+      expect(data[0].staffRole).toBe("manager");
     }
   });
 

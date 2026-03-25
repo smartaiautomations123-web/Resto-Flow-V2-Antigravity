@@ -8,7 +8,7 @@ describe("Multi-Location, Combos, and Labour Management", () => {
 
   beforeAll(async () => {
     const result = await db.createLocation("Test Location", "123 Main St", "555-1234", "test@example.com", "UTC");
-    locationId = (result as any)[0];
+    locationId = (result as any)[0].insertId;
   });
 
   describe("Locations", () => {
@@ -33,7 +33,7 @@ describe("Multi-Location, Combos, and Labour Management", () => {
   describe("Combos", () => {
     it("should create a combo", async () => {
       const result = await db.createCombo(locationId, "Test Combo", "15.99", "19.99", "4.00");
-      comboId = (result as any)[0];
+      comboId = (result as any)[0].insertId;
       expect(result).toBeDefined();
     });
 

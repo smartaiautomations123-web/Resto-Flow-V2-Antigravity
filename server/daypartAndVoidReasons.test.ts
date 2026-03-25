@@ -6,12 +6,15 @@ describe("Dayparts & Void Reasons", () => {
   let testMenuItemId: number;
 
   beforeAll(async () => {
-    const daypart = await db.createDaypart({ name: "Test Breakfast", startTime: "07:00", endTime: "11:00" });
+    const daypart = await db.createDaypart({ name: `Test Breakfast ${Date.now()}`, startTime: "07:00", endTime: "11:00" });
     testDaypartId = daypart[0].insertId;
+
+    const category = await db.createMenuCategory({ name: "Test Category", description: "Test", sortOrder: 1 });
+    const categoryId = category[0].insertId;
 
     const menuItem = await db.createMenuItem({
       name: "Test Item",
-      category: "breakfast",
+      categoryId: categoryId,
       price: "10.00",
       cost: "3.00",
       description: "Test item",
@@ -20,7 +23,7 @@ describe("Dayparts & Void Reasons", () => {
   });
 
   it("should create daypart", async () => {
-    const daypart = await db.createDaypart({ name: "Test Lunch", startTime: "11:00", endTime: "15:00" });
+    const daypart = await db.createDaypart({ name: `Test Lunch ${Date.now()}`, startTime: "11:00", endTime: "15:00" });
     expect(daypart[0].insertId).toBeGreaterThan(0);
   });
 

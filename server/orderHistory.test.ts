@@ -16,8 +16,8 @@ describe("Order History & Receipt Printing", () => {
     // Create test order
     const order = await db.createOrder({
       orderNumber: `TEST-${Date.now()}`,
-      customerId: customer[0].id,
-      type: "dine-in",
+      customerId: customer[0].insertId,
+      type: "takeaway",
       status: "completed",
       subtotal: "50.00",
       taxAmount: "5.00",
@@ -25,12 +25,13 @@ describe("Order History & Receipt Printing", () => {
       paymentMethod: "cash",
     });
 
-    testOrderId = order[0].id;
+    testOrderId = order[0].insertId;
 
     // Add test items
     await db.addOrderItem({
       orderId: testOrderId,
       menuItemId: 1,
+      name: "Item 1",
       quantity: 2,
       unitPrice: "20.00",
       totalPrice: "40.00",
@@ -40,6 +41,7 @@ describe("Order History & Receipt Printing", () => {
     await db.addOrderItem({
       orderId: testOrderId,
       menuItemId: 2,
+      name: "Item 2",
       quantity: 1,
       unitPrice: "10.00",
       totalPrice: "10.00",
@@ -99,8 +101,8 @@ describe("Order History & Receipt Printing", () => {
 
     const order = await db.createOrder({
       orderNumber: `CUST2-${Date.now()}`,
-      customerId: customer[0].id,
-      type: "takeout",
+      customerId: customer[0].insertId,
+      type: "takeaway",
       status: "completed",
       subtotal: "30.00",
       taxAmount: "3.00",
@@ -108,7 +110,7 @@ describe("Order History & Receipt Printing", () => {
       paymentMethod: "card",
     });
 
-    const orders = await db.getOrdersByCustomer(customer[0].id);
+    const orders = await db.getOrdersByCustomer(customer[0].insertId);
     expect(orders).toBeDefined();
     expect(orders.length).toBeGreaterThan(0);
   });

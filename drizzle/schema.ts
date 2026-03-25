@@ -930,6 +930,9 @@ export const systemSettings = mysqlTable("system_settings", {
   businessPhone: varchar("businessPhone", { length: 32 }),
   businessEmail: varchar("businessEmail", { length: 320 }),
   businessAddress: text("businessAddress"),
+  primaryColor: varchar("primaryColor", { length: 32 }).default("#e11d48"),
+  fontFamily: varchar("fontFamily", { length: 64 }).default("Inter"),
+  borderRadius: varchar("borderRadius", { length: 16 }).default("0.5rem"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -1025,6 +1028,8 @@ export const receiptSettings = mysqlTable("receipt_settings", {
   showTableNumber: boolean("showTableNumber").default(true),
   printLogo: boolean("printLogo").default(true),
   receiptWidth: int("receiptWidth").default(80), // characters
+  templateType: mysqlEnum("templateType", ["classic", "modern", "minimalist"]).default("classic"),
+  customCss: text("customCss"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -1134,7 +1139,7 @@ export type InsertCurrencySettings = typeof currencySettings.$inferInsert;
 // ─── Integrations ───────────────────────────────────────────────────
 export const integrations = mysqlTable("integrations", {
   id: int("id").autoincrement().primaryKey(),
-  type: mysqlEnum("type", ["slack", "teams", "quickbooks", "stripe", "square", "paypal", "uber_eats", "doordash", "grubhub", "webhook", "toast", "xtra_chef"]).notNull(),
+  type: mysqlEnum("type", ["slack", "teams", "quickbooks", "xero", "stripe", "square", "paypal", "uber_eats", "doordash", "grubhub", "webhook", "toast", "xtra_chef"]).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   isEnabled: boolean("isEnabled").default(true).notNull(),
   apiKey: text("apiKey"),

@@ -16,6 +16,7 @@ export default function Integrations() {
   const [slackWebhook, setSlackWebhook] = useState('');
   const [teamsWebhook, setTeamsWebhook] = useState('');
   const [qbAuthCode, setQbAuthCode] = useState('');
+  const [xeroAuthCode, setXeroAuthCode] = useState('');
   const [newWebhookUrl, setNewWebhookUrl] = useState('');
   const [newWebhookEvent, setNewWebhookEvent] = useState('order.created');
   const [toastApiKey, setToastApiKey] = useState('');
@@ -67,6 +68,14 @@ export default function Integrations() {
   const qbMut = trpc.settings.createQuickBooksIntegration.useMutation({
     onSuccess: () => { toast.success('QuickBooks integration connected'); setQbAuthCode(''); utils.settings.getIntegrations.invalidate(); },
     onError: () => toast.error('Failed to connect QuickBooks'),
+  });
+  const xeroMut = trpc.settings.createXeroIntegration.useMutation({
+    onSuccess: () => { toast.success('Xero integration connected'); setXeroAuthCode(''); utils.settings.getIntegrations.invalidate(); },
+    onError: () => toast.error('Failed to connect Xero'),
+  });
+  const testMut = trpc.settings.testIntegration.useMutation({
+    onSuccess: (data) => toast.success(data.message || 'Connection test successful!'),
+    onError: () => toast.error('Connection test failed'),
   });
   const webhookMut = trpc.settings.createWebhook.useMutation({
     onSuccess: () => { toast.success('Webhook created'); setNewWebhookUrl(''); utils.settings.getWebhooks.invalidate(); },
@@ -361,9 +370,14 @@ export default function Integrations() {
                     <CheckCircle className="w-4 h-4" />
                     <span>Connected to Slack · Webhook active</span>
                   </div>
-                  <Button variant="destructive" size="sm" onClick={() => deleteMut.mutate({ id: (integrations.slack as any).id })}>
-                    <Trash2 className="w-3 h-3 mr-1" /> Disconnect
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => testMut.mutate({ type: 'slack' })} disabled={testMut.isPending}>
+                      Test Connection
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => deleteMut.mutate({ id: (integrations.slack as any).id })}>
+                      <Trash2 className="w-3 h-3 mr-1" /> Disconnect
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -409,9 +423,14 @@ export default function Integrations() {
                     <CheckCircle className="w-4 h-4" />
                     <span>Connected to Microsoft Teams · Webhook active</span>
                   </div>
-                  <Button variant="destructive" size="sm" onClick={() => deleteMut.mutate({ id: (integrations.teams as any).id })}>
-                    <Trash2 className="w-3 h-3 mr-1" /> Disconnect
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => testMut.mutate({ type: 'teams' })} disabled={testMut.isPending}>
+                      Test Connection
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => deleteMut.mutate({ id: (integrations.teams as any).id })}>
+                      <Trash2 className="w-3 h-3 mr-1" /> Disconnect
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -461,9 +480,14 @@ export default function Integrations() {
                         <CheckCircle className="w-4 h-4" />
                         <span>Connected to QuickBooks Online</span>
                       </div>
-                      <Button variant="destructive" size="sm" onClick={() => deleteMut.mutate({ id: (integrations.quickbooks as any).id })}>
-                        <Trash2 className="w-3 h-3 mr-1" /> Disconnect
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => testMut.mutate({ type: 'quickbooks' })} disabled={testMut.isPending}>
+                          Test Sync
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => deleteMut.mutate({ id: (integrations.quickbooks as any).id })}>
+                          <Trash2 className="w-3 h-3 mr-1" /> Disconnect
+                        </Button>
+                      </div>
                     </div>
                     {(integrations?.quickbooks as any)?.lastSyncedAt && (
                       <p className="text-xs text-muted-foreground mt-1">Last synced: {new Date((integrations?.quickbooks as any).lastSyncedAt).toLocaleString()}</p>
@@ -485,6 +509,65 @@ export default function Integrations() {
                   </div>
                   <Button onClick={() => qbMut.mutate({ authCode: qbAuthCode })} disabled={!qbAuthCode || qbMut.isPending}>
                     <BookOpen className="w-4 h-4 mr-2" />{qbMut.isPending ? 'Connecting…' : 'Connect QuickBooks'}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-lg font-bold text-blue-600">X</div>
+                  <div>
+                    <CardTitle>Xero</CardTitle>
+                    <CardDescription>Sync financial data and invoices with Xero accounting</CardDescription>
+                  </div>
+                </div>
+                <Badge variant={integrations?.xero?.active ? 'default' : 'secondary'}>
+                  {integrations?.xero?.active ? 'Connected' : 'Not Connected'}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {integrations?.xero?.active ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Connected to Xero</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => testMut.mutate({ type: 'xero' })} disabled={testMut.isPending}>
+                          Test Sync
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => deleteMut.mutate({ id: (integrations.xero as any).id })}>
+                          <Trash2 className="w-3 h-3 mr-1" /> Disconnect
+                        </Button>
+                      </div>
+                    </div>
+                    {(integrations?.xero as any)?.lastSyncedAt && (
+                      <p className="text-xs text-muted-foreground mt-1">Last synced: {new Date((integrations?.xero as any).lastSyncedAt).toLocaleString()}</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Xero Authorization Code</Label>
+                    <Input
+                      value={xeroAuthCode}
+                      onChange={e => setXeroAuthCode(e.target.value)}
+                      placeholder="Paste the authorization code from Xero..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Authorize RestoFlow in your Xero developer portal and paste the code above.
+                    </p>
+                  </div>
+                  <Button onClick={() => xeroMut.mutate({ authCode: xeroAuthCode })} disabled={!xeroAuthCode || xeroMut.isPending}>
+                    <ExternalLink className="w-4 h-4 mr-2" />{xeroMut.isPending ? 'Connecting…' : 'Connect Xero'}
                   </Button>
                 </div>
               )}
@@ -568,6 +651,7 @@ export default function Integrations() {
                     { name: 'Slack', description: 'Message notifications', active: !!integrations?.slack?.active },
                     { name: 'Microsoft Teams', description: 'Team collaboration alerts', active: !!integrations?.teams?.active },
                     { name: 'QuickBooks', description: 'Accounting sync', active: !!integrations?.quickbooks?.active },
+                    { name: 'Xero', description: 'Accounting sync', active: !!integrations?.xero?.active },
                     { name: 'Toast POS', description: 'Point of Sale sync', active: !!integrations?.toast?.active },
                     { name: 'Square POS', description: 'Point of Sale sync', active: !!integrations?.square?.active },
                     { name: 'xtraCHEF', description: 'Inventory management', active: !!integrations?.xtra_chef?.active },

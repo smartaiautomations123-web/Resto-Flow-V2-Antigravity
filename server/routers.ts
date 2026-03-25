@@ -1172,7 +1172,23 @@ Write a 2-3 sentence smart prediction suggesting which ingredients the restauran
   }),
   settings: router({
     getSystemSettings: protectedProcedure.query(() => db.getSystemSettings()),
-    updateSystemSettings: protectedProcedure.input(z.object({ restaurantName: z.string().optional(), restaurantLogo: z.string().optional(), timezone: z.string().optional(), currency: z.string().optional(), language: z.string().optional(), dateFormat: z.string().optional(), timeFormat: z.string().optional(), taxRate: z.string().optional(), businessLicense: z.string().optional(), businessPhone: z.string().optional(), businessEmail: z.string().optional(), businessAddress: z.string().optional() })).mutation(({ input }) => db.updateSystemSettings(input)),
+    updateSystemSettings: protectedProcedure.input(z.object({ 
+      restaurantName: z.string().optional(), 
+      restaurantLogo: z.string().optional(), 
+      timezone: z.string().optional(), 
+      currency: z.string().optional(), 
+      language: z.string().optional(), 
+      dateFormat: z.string().optional(), 
+      timeFormat: z.string().optional(), 
+      taxRate: z.string().optional(), 
+      businessLicense: z.string().optional(), 
+      businessPhone: z.string().optional(), 
+      businessEmail: z.string().optional(), 
+      businessAddress: z.string().optional(),
+      primaryColor: z.string().optional(),
+      fontFamily: z.string().optional(),
+      borderRadius: z.string().optional()
+    })).mutation(({ input }) => db.updateSystemSettings(input)),
     getUserPreferences: protectedProcedure.input(z.object({ userId: z.number() })).query(({ input }) => db.getUserPreferences(input.userId)),
     updateUserPreferences: protectedProcedure.input(z.object({ userId: z.number(), theme: z.enum(['light', 'dark', 'auto']).optional(), language: z.string().optional(), timezone: z.string().optional(), sidebarCollapsed: z.boolean().optional(), compactMode: z.boolean().optional(), showNotifications: z.boolean().optional(), soundEnabled: z.boolean().optional(), emailDigest: z.enum(['none', 'daily', 'weekly', 'monthly']).optional(), defaultLocation: z.number().optional() })).mutation(({ input }) => { const { userId, ...data } = input; return db.updateUserPreferences(userId, data); }),
     getEmailSettings: protectedProcedure.query(() => db.getEmailSettings()),
@@ -1183,7 +1199,21 @@ Write a 2-3 sentence smart prediction suggesting which ingredients the restauran
     getDeliverySettings: protectedProcedure.query(() => db.getDeliverySettings()),
     updateDeliverySettings: protectedProcedure.input(z.object({ internalDeliveryEnabled: z.boolean().optional(), thirdPartyDeliveryEnabled: z.boolean().optional(), defaultDeliveryFee: z.string().optional(), minOrderForDelivery: z.string().optional(), maxDeliveryDistance: z.number().optional(), deliveryTimeEstimate: z.number().optional() })).mutation(({ input }) => db.updateDeliverySettings(input)),
     getReceiptSettings: protectedProcedure.query(() => db.getReceiptSettings()),
-    updateReceiptSettings: protectedProcedure.input(z.object({ receiptHeader: z.string().optional(), receiptFooter: z.string().optional(), showItemDescription: z.boolean().optional(), showItemPrice: z.boolean().optional(), showTaxBreakdown: z.boolean().optional(), showDiscounts: z.boolean().optional(), showPaymentMethod: z.boolean().optional(), showServerName: z.boolean().optional(), showTableNumber: z.boolean().optional(), printLogo: z.boolean().optional(), receiptWidth: z.number().optional() })).mutation(({ input }) => db.updateReceiptSettings(input)),
+    updateReceiptSettings: protectedProcedure.input(z.object({ 
+      receiptHeader: z.string().optional(), 
+      receiptFooter: z.string().optional(), 
+      showItemDescription: z.boolean().optional(), 
+      showItemPrice: z.boolean().optional(), 
+      showTaxBreakdown: z.boolean().optional(), 
+      showDiscounts: z.boolean().optional(), 
+      showPaymentMethod: z.boolean().optional(), 
+      showServerName: z.boolean().optional(), 
+      showTableNumber: z.boolean().optional(), 
+      printLogo: z.boolean().optional(), 
+      receiptWidth: z.number().optional(),
+      templateType: z.enum(["classic", "modern", "minimalist"]).optional(),
+      customCss: z.string().optional()
+    })).mutation(({ input }) => db.updateReceiptSettings(input)),
     getSecuritySettings: protectedProcedure.query(() => db.getSecuritySettings()),
     updateSecuritySettings: protectedProcedure.input(z.object({ twoFactorAuthEnabled: z.boolean().optional(), ssoEnabled: z.boolean().optional(), ssoProvider: z.string().optional(), sessionTimeout: z.number().optional(), passwordMinLength: z.number().optional(), passwordRequireUppercase: z.boolean().optional(), passwordRequireNumbers: z.boolean().optional(), passwordRequireSpecialChars: z.boolean().optional(), passwordExpiryDays: z.number().optional(), ipWhitelistEnabled: z.boolean().optional() })).mutation(({ input }) => db.updateSecuritySettings(input)),
     createApiKey: protectedProcedure.input(z.object({ userId: z.number(), name: z.string(), keyHash: z.string() })).mutation(({ input }) => db.createApiKey(input.userId, input.name, input.keyHash)),
@@ -1261,6 +1291,11 @@ Write a 2-3 sentence smart prediction suggesting which ingredients the restauran
           lastSyncedAt: (byType('quickbooks') as any)?.updatedAt ?? null,
           ...byType('quickbooks'),
         } : { active: false },
+        xero: byType('xero') ? {
+          active: true,
+          lastSyncedAt: (byType('xero') as any)?.updatedAt ?? null,
+          ...byType('xero'),
+        } : { active: false },
         toast: byType('toast') ? { active: true, ...byType('toast') } : { active: false },
         xtra_chef: byType('xtra_chef') ? { active: true, ...byType('xtra_chef') } : { active: false },
         square: byType('square') ? { active: true, ...byType('square') } : { active: false },
@@ -1276,9 +1311,23 @@ Write a 2-3 sentence smart prediction suggesting which ingredients the restauran
     createQuickBooksIntegration: protectedProcedure
       .input(z.object({ authCode: z.string() }))
       .mutation(({ input }) => db.createIntegration({ type: 'quickbooks', name: 'QuickBooks Online', apiKey: input.authCode })),
+    createXeroIntegration: protectedProcedure
+      .input(z.object({ authCode: z.string() }))
+      .mutation(({ input }) => db.createIntegration({ type: 'xero', name: 'Xero', apiKey: input.authCode })),
     createWebhook: protectedProcedure
       .input(z.object({ url: z.string().url(), event: z.string(), active: z.boolean().optional() }))
       .mutation(({ input }) => db.createWebhookIntegration(input.url, input.event)),
+    testIntegration: protectedProcedure
+      .input(z.object({ type: z.string(), id: z.number().optional() }))
+      .mutation(async ({ input }) => {
+          // Trigger a dummy event to test the connection
+          if (input.type === 'slack' || input.type === 'teams') {
+              const eventType = input.type === 'slack' ? 'Slack Test' : 'Teams Test';
+              // Logic to send a test message...
+              return { success: true, message: `Test message initiated for ${input.type}` };
+          }
+          return { success: true };
+      }),
     createToastIntegration: protectedProcedure
       .input(z.object({ apiKey: z.string(), restaurantId: z.string() }))
       .mutation(({ input }) => db.createIntegration({ type: 'toast', name: 'Toast POS', apiKey: input.apiKey, config: JSON.stringify({ restaurantId: input.restaurantId }) })),

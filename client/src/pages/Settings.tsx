@@ -222,6 +222,41 @@ export default function Settings() {
                       <Input value={system.form.businessAddress ?? ''} onChange={e => system.set('businessAddress', e.target.value)} placeholder="123 Main St, City, State" />
                     </div>
                   </div>
+
+                  <div className="pt-4 border-t space-y-4">
+                    <h3 className="text-lg font-medium">Global Branding & Theme</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Primary Brand Color</Label>
+                        <div className="flex gap-2">
+                          <Input type="color" className="p-1 h-10 w-20" value={system.form.primaryColor ?? '#e11d48'} onChange={e => system.set('primaryColor', e.target.value)} />
+                          <Input value={system.form.primaryColor ?? '#e11d48'} onChange={e => system.set('primaryColor', e.target.value)} placeholder="#e11d48" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Global Font Family</Label>
+                        <Select value={system.form.fontFamily ?? 'Inter'} onValueChange={v => system.set('fontFamily', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Inter">Inter (Default)</SelectItem>
+                            <SelectItem value="Roboto">Roboto</SelectItem>
+                            <SelectItem value="Playfair Display">Playfair Display</SelectItem>
+                            <SelectItem value="Outfit">Outfit</SelectItem>
+                            <SelectItem value="Montserrat">Montserrat</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Border Radius (rem)</Label>
+                        <Input value={system.form.borderRadius ?? '0.5rem'} onChange={e => system.set('borderRadius', e.target.value)} placeholder="0.5rem" />
+                      </div>
+                      <div className="space-y-2 md:col-span-3">
+                        <Label>Restaurant Logo URL</Label>
+                        <Input value={system.form.restaurantLogo ?? ''} onChange={e => system.set('restaurantLogo', e.target.value)} placeholder="https://example.com/logo.png" />
+                      </div>
+                    </div>
+                  </div>
+
                   <Button onClick={() => saveSystem.mutate(cleanPayload(system.form))} disabled={saveSystem.isPending}>
                     <Save className="w-4 h-4 mr-2" />{saveSystem.isPending ? 'Saving…' : 'Save System Settings'}
                   </Button>
@@ -502,6 +537,33 @@ export default function Settings() {
                       <Input type="number" value={receipt.form.receiptWidth ?? 80} onChange={e => receipt.set('receiptWidth', Number(e.target.value))} />
                     </div>
                   </div>
+
+                  <div className="pt-4 border-t space-y-4">
+                    <h3 className="text-lg font-medium">Layout & Customization</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Template Design</Label>
+                        <Select value={receipt.form.templateType ?? 'classic'} onValueChange={v => receipt.set('templateType', v)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="classic">Classic (Thermal)</SelectItem>
+                            <SelectItem value="modern">Modern (Compact)</SelectItem>
+                            <SelectItem value="minimalist">Minimalist</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Custom CSS</Label>
+                        <textarea 
+                          className="w-full min-h-[100px] p-2 rounded-md border border-input bg-background text-sm font-mono"
+                          value={receipt.form.customCss ?? ''} 
+                          onChange={e => receipt.set('customCss', e.target.value)}
+                          placeholder=".receipt-container { ... }"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <Button onClick={() => saveReceipt.mutate(cleanPayload(receipt.form))} disabled={saveReceipt.isPending}>
                     <Save className="w-4 h-4 mr-2" />{saveReceipt.isPending ? 'Saving…' : 'Save Receipt Settings'}
                   </Button>

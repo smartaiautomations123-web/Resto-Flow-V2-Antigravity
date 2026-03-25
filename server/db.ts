@@ -69,7 +69,7 @@ export async function getDb() {
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return db.select().from(users).where(eq(users.openId, openId)).then(rows => rows[0]);
+  return db.select().from(users).where(eq(users.openId, openId)).then(rows => rows[0] ?? null);
 }
 
 export async function createUser(openId: string, name?: string, email?: string) {
@@ -405,6 +405,13 @@ export async function adjustIngredientStock(id: number, delta: number, reason: s
   await db.update(ingredients).set({
     currentStock: sql`GREATEST(0, ${ingredients.currentStock} + ${delta})`,
   }).where(eq(ingredients.id, id)).execute();
+  
+  // Check if stock is low and trigger event
+  const ing = await db.select().from(ingredients).where(eq(ingredients.id, id)).then(rows => rows[0]);
+  if (ing && Number(ing.currentStock) <= Number(ing.minStock)) {
+      IntegrationService.triggerEvent("stock.low", ing);
+  }
+
   return { id, delta, reason, adjustedAt: new Date() };
 }
 
@@ -647,6 +654,12 @@ export async function createVendorProductMapping(data: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.insert(vendorProductMappings).values(data).execute();
+}
+
+export async function deleteVendorProductMapping(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.delete(vendorProductMappings).where(eq(vendorProductMappings.id, id)).execute();
 }
 
 // ─── Price Uploads ────────────────────────────────────────────────────
@@ -1312,7 +1325,7 @@ export async function getOrderHistory(filters?: { dateFrom?: string; dateTo?: st
     .from(orders)
     .leftJoin(customers, eq(orders.customerId, customers.id))
     .leftJoin(orderItems, eq(orders.id, orderItems.orderId))
-    .groupBy(orders.id);
+    .groupBy(orders.id, customers.name);
 
   if (conditions.length > 0) {
     return baseQuery.where(and(...conditions)).orderBy(desc(orders.createdAt)).limit(500);
@@ -1744,6 +1757,8 @@ export async function getOrderStatusTimeline(orderId: number) {
   };
 }
 
+import { IntegrationService } from "./services/IntegrationService";
+
 export async function updateOrderStatus(orderId: number, newStatus: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -1757,7 +1772,18 @@ export async function updateOrderStatus(orderId: number, newStatus: string) {
     updateData.completedAt = new Date();
   }
 
-  return await db.update(orders).set(updateData).where(eq(orders.id, orderId));
+  const result = await db.update(orders).set(updateData).where(eq(orders.id, orderId));
+
+  // Trigger integration event
+  if (newStatus === "completed") {
+      getOrderWithItems(orderId).then(order => {
+          if (order) IntegrationService.triggerEvent("order.completed", order);
+      }).catch(console.error);
+  } else if (newStatus === "cancelled") {
+      IntegrationService.triggerEvent("order.cancelled", { id: orderId });
+  }
+
+  return result;
 }
 
 // ─── Push Notifications ───────────────────────────────────────────
@@ -2033,7 +2059,7 @@ export async function getVoidReasonReport(startDate: Date, endDate: Date) {
   const orderVoids = await db.select({
     reason: orderVoidReasons.reason,
     count: sql<number>`count(*)`,
-    totalAmount: sql<number>`sum(o.total)`,
+    totalAmount: sql<number>`sum(${orders.total})`,
   }).from(orderVoidReasons)
     .innerJoin(orders, eq(orderVoidReasons.orderId, orders.id))
     .where(and(gte(orderVoidReasons.voidedAt, startDate), lte(orderVoidReasons.voidedAt, endDate)))
@@ -2058,7 +2084,7 @@ export async function getVoidReasonStats(startDate: Date, endDate: Date) {
   const stats = await db.select({
     reason: orderVoidReasons.reason,
     count: sql<number>`count(*)`,
-    percentage: sql<number>`round(count(*) * 100.0 / (select count(*) from order_void_reasons where voided_at >= ? and voided_at <= ?), 2)`,
+    percentage: sql<number>`round(count(*) * 100.0 / (select count(*) from order_void_reasons where voided_at >= ${startDate} and voided_at <= ${endDate}), 2)`,
   }).from(orderVoidReasons)
     .where(and(gte(orderVoidReasons.voidedAt, startDate), lte(orderVoidReasons.voidedAt, endDate)))
     .groupBy(orderVoidReasons.reason);
@@ -4186,6 +4212,9 @@ export async function resetSettingsToDefaults() {
     timezone: 'UTC',
     currency: 'USD',
     language: 'en',
+    primaryColor: '#e11d48',
+    fontFamily: 'Inter',
+    borderRadius: '0.5rem',
   });
 
   await db.insert(paymentSettings).values({
@@ -4197,6 +4226,7 @@ export async function resetSettingsToDefaults() {
     showItemDescription: true,
     showItemPrice: true,
     showTaxBreakdown: true,
+    templateType: 'classic',
   });
 
   await db.insert(securitySettings).values({
@@ -4288,6 +4318,12 @@ export async function listWebhooks() {
   return await db.select().from(integrations)
     .where(and(eq(integrations.type, 'webhook' as any), eq(integrations.isEnabled, true)))
     .orderBy(desc(integrations.createdAt));
+}
+
+export async function createIntegrationLog(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(integrationLogs).values(data).execute();
 }
 
 export async function createWebhookIntegration(url: string, event: string) {
